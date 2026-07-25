@@ -30,8 +30,13 @@ export default class BattleScene extends Phaser.Scene {
     this.socket.on(EVENTS.ROUND_RESULT, (p) => this.onRoundResult(p));
     this.socket.once(EVENTS.MATCH_OVER, (p) => this.onMatchOver(p));
 
-    // 임시 입력: 스페이스 = 인장 하나 맺기 (인식기 붙으면 recognizer.onSeal로 교체)
-    this.input.keyboard.on('keydown-SPACE', () => this.handleSeal());
+    // 임시 입력: 스페이스 = "지금 목표 인장이 인식된 셈" 시뮬레이션.
+    // A의 인식기가 붙으면 this.attachRecognizer(recognizer)로 대체되고 이 줄은 제거.
+    this.input.keyboard.on('keydown-SPACE', () => {
+      if (!this.locked && this.progress < this.sequence.length) {
+        this.onSealMatched(this.sequence[this.progress]);
+      }
+    });
 
     // 화상(WebRTC) 시작 — 입장한 쪽(joiner)이 발신, 방장이 응답. 실패해도 게임 무관.
     const localStream = this.registry.get('localStream');
@@ -84,15 +89,28 @@ export default class BattleScene extends Phaser.Scene {
     this.renderSeals();
   }
 
-  // 인장 맺기 1회 (임시: 항상 맞는 것으로 처리). 인식기 붙으면 sealId 일치 검사로 교체.
-  handleSeal() {
+  // ── A ↔ B 계약 연결 지점 ──
+  // A는 createRecognizer()로 만든 인식기를 이 메서드에 넘기기만 하면 된다.
+  // 인식기가 인장을 확정할 때마다 onSeal(sealId, confidence, timestamp)이 호출되고,
+  // 그게 아래 onSealMatched로 이어진다. (인식기 내부/프레임 구동은 A 담당)
+  attachRecognizer(recognizer) {
+    this.recognizer = recognizer;
+    recognizer.onSeal = (sealId, confidence, timestamp) =>
+      this.onSealMatched(sealId, confidence, timestamp);
+  }
+
+  // 인식기가 인장 하나를 확정 → 지금 목표와 일치하면 한 칸 진행.
+  // 오인식 페널티 없음: 목표와 다르면 그냥 무시 (§3.2).
+  onSealMatched(sealId, confidence = 1, timestamp = Date.now()) {
     if (this.locked || this.progress >= this.sequence.length) return;
+    if (sealId !== this.sequence[this.progress]) return; // 목표 인장이 아니면 무시
+
     this.progress += 1;
     this.renderSeals();
 
     if (this.progress >= this.sequence.length) {
       this.locked = true; // 완성 후 서버 판정까지 입력 잠금
-      this.socket.emit(EVENTS.SEQ_COMPLETE, {}); // 타임스탬프는 서버 수신 시각
+      this.socket.emit(EVENTS.SEQ_COMPLETE, {}); // 승부는 서버 수신 순서로 판정
     }
   }
 

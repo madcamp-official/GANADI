@@ -1,6 +1,14 @@
 // ★ 교체 가능 모듈 계약 (§4.6) — 이 파일의 공개 인터페이스는 고정.
-// 내부 구현이 6종 룰 기반이든 12종 MLP든 무관하게 onSeal(sealId, confidence)만 발행한다.
+// 내부 구현이 6종 룰 기반이든 12종 MLP든 무관하게 onSeal(sealId, confidence, timestamp)만 발행한다.
 // Day 5에 룰 기반 → MLP 교체가 "구현 함수만 바꾸는" 수준이 되도록 설계.
+//
+// ── A ↔ B 계약 (확정) ──
+//   onSeal(sealId, confidence, timestamp)
+//     sealId    : SEAL_IDS 문자열 ("horse" | "dog" | ...)  ← seals.js/constants.js
+//     confidence: 0~1
+//     timestamp : Date.now() (ms) — 확정 시각. 서버 승부는 SEQ_COMPLETE 수신 순서로
+//                 판정하므로 게임엔 참고용이지만, 계약상 항상 함께 넘긴다.
+//   방향: A(인식기)가 부른다 ← B가 만든 함수를 recognizer.onSeal에 꽂는다.
 
 import { createHandLandmarker } from './handLandmarker.js';
 import { extractFeatures } from './features.js';
@@ -14,7 +22,7 @@ export async function createRecognizer() {
   const landmarker = await createHandLandmarker();
   const voteBuffer = [];
 
-  /** @type {(sealId: string, confidence: number) => void} */
+  /** @type {(sealId: string, confidence: number, timestamp: number) => void} */
   let onSeal = () => {};
   let heldSeal = null;
   let heldSince = 0;
@@ -39,7 +47,7 @@ export async function createRecognizer() {
     // 0.4초 홀드 확정
     if (voted === heldSeal) {
       if (nowMs - heldSince >= 400) {
-        onSeal(voted, confidence);
+        onSeal(voted, confidence, Date.now()); // 계약: (sealId, confidence, timestamp)
         heldSeal = null; // 재확정 방지 (다음 프레임에서 새로 홀드)
       }
     } else {
