@@ -30,8 +30,13 @@ export default class BattleScene extends Phaser.Scene {
     this.socket.on(EVENTS.ROUND_RESULT, (p) => this.onRoundResult(p));
     this.socket.once(EVENTS.MATCH_OVER, (p) => this.onMatchOver(p));
 
-    // 임시 입력: 스페이스 = "지금 목표 인장이 인식된 셈" 시뮬레이션.
-    // A의 인식기가 붙으면 this.attachRecognizer(recognizer)로 대체되고 이 줄은 제거.
+    // A의 인식기 붙이기 — A가 부팅 시 registry에 넣어둔 recognizer를 집어 연결.
+    // (A가 카메라+step() 루프 소유. 여기선 onSeal → onSealMatched 대입만.)
+    this.recognizer = this.registry.get('recognizer') ?? null;
+    if (this.recognizer) this.attachRecognizer(this.recognizer);
+
+    // 폴백: 인식기가 아직 없으면 스페이스로 "목표 인장 인식된 셈" 시뮬레이션.
+    // 인식기가 붙으면 이 입력은 안 써도 됨(중복 무해).
     this.input.keyboard.on('keydown-SPACE', () => {
       if (!this.locked && this.progress < this.sequence.length) {
         this.onSealMatched(this.sequence[this.progress]);
@@ -50,6 +55,8 @@ export default class BattleScene extends Phaser.Scene {
       this.socket.off(EVENTS.ROUND_START);
       this.socket.off(EVENTS.ROUND_RESULT);
       this.video?.stop();
+      // 죽은 씬으로 인식 이벤트가 흘러들지 않게 콜백 해제 (A의 step 루프는 계속 돎)
+      if (this.recognizer) this.recognizer.onSeal = () => {};
     });
 
     // 로비에서 넘겨준 첫 라운드 즉시 반영
