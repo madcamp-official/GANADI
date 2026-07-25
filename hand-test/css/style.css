@@ -1,0 +1,11 @@
+body { margin: 0; background: #111; color: #eee; font-family: system-ui, sans-serif; }
+#wrap { position: relative; width: 640px; max-width: 100%; margin: 16px auto; }
+
+/* video와 canvas를 정확히 겹쳐 오버레이 */
+#video, #overlay { position: absolute; top: 0; left: 0; width: 640px; height: 480px; }
+#video   { transform: scaleX(-1); } /* 거울 모드 (셀카처럼) */
+#overlay { transform: scaleX(-1); } /* 랜드마크도 같이 뒤집어 좌표 일치 */
+#spacer  { width: 640px; height: 480px; } /* absolute 요소 자리 확보용 */
+
+#hud { text-align: center; margin: 12px; font-size: 14px; line-height: 1.6; }
+button { padding: 8px 16px; font-size: 15px; cursor: pointer; }

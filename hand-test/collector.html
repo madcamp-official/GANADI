@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>인장 데이터 수집 툴</title>
+  <link rel="stylesheet" href="css/style.css" />
+  <link rel="stylesheet" href="css/collector.css" />
+</head>
+<body>
+  <div id="hud">
+    <button id="start">▶ 웹캠 시작</button>
+    <button id="export">💾 JSON 저장</button>
+    <button id="export-zip">🗂 이미지+JSON(ZIP)</button>
+    <label id="img-toggle"><input type="checkbox" id="save-images" checked /> 이미지도 캡처</label>
+    <div id="status">대기 중…</div>
+  </div>
+
+  <!-- ① 인장 선택 UI -->
+  <div id="seal-picker">
+    <div id="seal-buttons"></div>
+    <div id="current-label">선택된 인장: <b id="label-name">없음</b></div>
+  </div>
+
+  <!-- ⑤ 인장별 수집 개수 카운터 -->
+  <div id="seal-counts"></div>
+  <div id="total-count">총 0장</div>
+
+  <div id="wrap">
+    <div id="spacer"></div>
+    <video id="video" autoplay playsinline muted></video>
+    <canvas id="overlay" width="640" height="480"></canvas>
+  </div>
+
+  <script type="module" src="js/collector.js"></script>
+</body>
+</html>

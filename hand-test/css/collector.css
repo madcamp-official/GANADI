@@ -1,0 +1,31 @@
+/* 수집 툴 전용 스타일 */
+
+#seal-picker { text-align: center; margin: 8px auto; max-width: 700px; }
+
+#seal-buttons {
+  display: flex; flex-wrap: wrap; gap: 6px; justify-content: center;
+}
+#seal-buttons button {
+  padding: 6px 12px; font-size: 15px; cursor: pointer;
+  background: #222; color: #eee; border: 1px solid #444; border-radius: 6px;
+}
+#seal-buttons button:hover { background: #333; }
+#seal-buttons button.selected {
+  background: #4caf50; color: #fff; border-color: #4caf50; font-weight: bold;
+}
+
+#current-label { margin-top: 10px; font-size: 18px; }
+#current-label b { color: #4caf50; }
+
+/* ⑤ 카운터 */
+#seal-counts {
+  display: flex; flex-wrap: wrap; gap: 6px; justify-content: center;
+  max-width: 700px; margin: 10px auto 0;
+}
+#seal-counts .count-chip {
+  padding: 4px 10px; font-size: 14px; border-radius: 12px;
+  background: #1e1e1e; border: 1px solid #333; color: #aaa;
+}
+#seal-counts .count-chip.has { color: #eee; border-color: #4caf50; }
+#seal-counts .count-chip b { color: #4caf50; }
+#total-count { text-align: center; margin: 8px; font-size: 15px; color: #4caf50; }
