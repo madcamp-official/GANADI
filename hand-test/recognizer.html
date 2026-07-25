@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>인장 인식기 테스트 (말·닭·개)</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <div id="hud">
+    <button id="start">▶ 웹캠 시작</button>
+    <div id="status">대기 중…</div>
+    <div id="candidate">후보: —</div>
+    <div id="fired">최근 발동: —</div>
+  </div>
+  <div id="wrap">
+    <div id="spacer"></div>
+    <video id="video" autoplay playsinline muted></video>
+    <canvas id="overlay" width="640" height="480"></canvas>
+  </div>
+
+  <script type="module" src="js/recognizer_test.js"></script>
+</body>
+</html>
