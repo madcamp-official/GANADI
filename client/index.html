@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>인술대전</title>
+    <style>
+      body { margin: 0; background: #1a1420; overflow: hidden; }
+      #game { display: block; }
+      /* 상대/내 웹캠 프리뷰 — Phaser 캔버스 옆 DOM에 표시 (판정 미사용) */
+      #video-layer { position: fixed; top: 8px; right: 8px; display: flex; gap: 8px; }
+      #video-layer video { width: 160px; border-radius: 8px; background: #000; }
+    </style>
+  </head>
+  <body>
+    <div id="game"></div>
+    <div id="video-layer">
+      <video id="local-cam" autoplay muted playsinline></video>
+      <video id="remote-cam" autoplay playsinline></video>
+    </div>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
