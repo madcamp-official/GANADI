@@ -22,7 +22,7 @@ io.on('connection', (socket) => {
 
   socket.on('disconnect', () => {
     console.log('[io] disconnected', socket.id);
-    // TODO: 진행 중 방이면 상대 몰수승 처리 (재접속 복구는 스코프 아웃)
+    // 진행 중 방의 몰수승·정리는 rooms.js의 disconnect 핸들러가 담당.
   });
 });
 
