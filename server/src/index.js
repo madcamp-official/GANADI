@@ -6,7 +6,7 @@ import { createServer } from 'node:http';
 import { Server } from 'socket.io';
 import { registerRoomHandlers } from './rooms.js';
 
-const PORT = process.env.PORT ?? 3000;
+const PORT = process.env.PORT ?? 3001;
 
 const app = express();
 const httpServer = createServer(app);

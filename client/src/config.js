@@ -1,6 +1,6 @@
 // 클라이언트 설정값 모음.
 
-export const SERVER_URL = import.meta.env.VITE_SERVER_URL ?? 'http://localhost:3000';
+export const SERVER_URL = import.meta.env.VITE_SERVER_URL ?? 'http://localhost:3001';
 
 export const GAME = {
   WIDTH: 1280,
