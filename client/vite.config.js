@@ -5,6 +5,7 @@ import { defineConfig } from 'vite';
 export default defineConfig({
   server: {
     host: true, // LAN 노출 (실대전 테스트용)
+    allowedHosts: ['.madcamp-kaist.org'],
     // https: true,
   },
 });
