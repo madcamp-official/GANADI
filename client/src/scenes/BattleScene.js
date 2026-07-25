@@ -1,45 +1,152 @@
-// 대전 씬 — 목표 인장 시퀀스 표시, 양측 체력바, 진행 게이지.
-// 서버 권위: 로컬 판정 없음. 시퀀스 완성 시 서버에 이벤트 송신, 판정은 수신해 반영.
+// 대전 씬 — 목표 인장 시퀀스, 양측 체력바, 내 진행 게이지.
+// 서버 권위: 로컬 판정 없음. 시퀀스 완성 시 서버에 SEQ_COMPLETE만 송신, 판정은 수신해 반영.
+// (인식기 연결 전까지) 스페이스바로 인장 맺기를 시뮬레이션 → onSeal 대체.
 
 import Phaser from 'phaser';
-import { EVENTS } from '../../../shared/constants.js';
+import { EVENTS, RULES } from '../../../shared/constants.js';
+import { SEALS } from '../data/seals.js';
 import { getSocket } from '../net/socket.js';
+import { startVideoCall } from '../net/webrtc.js';
+import { GAME } from '../config.js';
 
 export default class BattleScene extends Phaser.Scene {
   constructor() {
     super('Battle');
   }
 
-  create() {
+  create(data) {
     this.socket = getSocket();
+    this.myId = this.socket.id;
 
-    // TODO: UI — 목표 인장 아이콘 열, 내/상대 체력바, 카운트다운, 진행 게이지.
-
-    this.socket.on(EVENTS.ROUND_START, ({ sequence }) => {
-      this.startSequence(sequence);
-    });
-
-    this.socket.on(EVENTS.ROUND_RESULT, ({ winner, damage, hp }) => {
-      // TODO: 이펙트/화면 흔들림/효과음 + 체력바 갱신.
-    });
-
-    this.socket.on(EVENTS.MATCH_OVER, ({ winner }) => {
-      this.scene.start('Result', { winner });
-    });
-  }
-
-  startSequence(sequence) {
-    this.target = sequence;
+    this.sequence = [];
     this.progress = 0;
-    // recognizer가 onSeal(sealId, confidence)를 발행하면 아래 콜백으로 진행 판정.
-    // this.recognizer.onSeal = (sealId) => this.handleSeal(sealId);
+    this.locked = true; // 라운드 시작 전엔 입력 잠금
+    this.hp = { [this.myId]: RULES.MAX_HP };
+
+    this.buildStaticUI();
+
+    // 서버 이벤트
+    this.socket.on(EVENTS.ROUND_START, (p) => this.onRoundStart(p));
+    this.socket.on(EVENTS.ROUND_RESULT, (p) => this.onRoundResult(p));
+    this.socket.once(EVENTS.MATCH_OVER, (p) => this.onMatchOver(p));
+
+    // 임시 입력: 스페이스 = 인장 하나 맺기 (인식기 붙으면 recognizer.onSeal로 교체)
+    this.input.keyboard.on('keydown-SPACE', () => this.handleSeal());
+
+    // 화상(WebRTC) 시작 — 입장한 쪽(joiner)이 발신, 방장이 응답. 실패해도 게임 무관.
+    const localStream = this.registry.get('localStream');
+    if (localStream && data?.code) {
+      this.video = startVideoCall(this.socket, data.code, localStream, {
+        isInitiator: !data.isCreator,
+      });
+    }
+
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      this.socket.off(EVENTS.ROUND_START);
+      this.socket.off(EVENTS.ROUND_RESULT);
+      this.video?.stop();
+    });
+
+    // 로비에서 넘겨준 첫 라운드 즉시 반영
+    if (data?.firstRound) this.onRoundStart(data.firstRound);
   }
 
-  handleSeal(sealId) {
-    // TODO: 현재 목표 인장과 일치하면 progress++, 상대에게 진행 상황 브로드캐스트.
-    //   시퀀스 완성 시 EVENTS.SEQ_COMPLETE 송신 (@timestamp는 서버가 수신 시각 사용).
-    if (this.progress >= this.target.length) {
-      this.socket.emit(EVENTS.SEQ_COMPLETE, {});
+  buildStaticUI() {
+    // 체력바 라벨
+    this.add.text(40, 30, 'ME', { fontSize: '22px', color: '#8fd3ff' });
+    this.add.text(GAME.WIDTH - 40, 30, 'ENEMY', { fontSize: '22px', color: '#ff9a9a' })
+      .setOrigin(1, 0);
+    this.hpGfx = this.add.graphics();
+    this.drawHp();
+
+    this.roundText = this.add.text(GAME.WIDTH / 2, 40, '', {
+      fontSize: '20px', color: '#c9b8ee',
+    }).setOrigin(0.5);
+
+    this.sealRow = this.add.container(0, 0);
+
+    this.hint = this.add.text(GAME.WIDTH / 2, GAME.HEIGHT - 50,
+      '[스페이스] 인장 맺기 (인식기 연결 전 임시 입력)', {
+        fontSize: '18px', color: '#7a6a95',
+      }).setOrigin(0.5);
+
+    this.banner = this.add.text(GAME.WIDTH / 2, GAME.HEIGHT / 2 - 140, '', {
+      fontSize: '40px', fontStyle: 'bold', color: '#fff',
+    }).setOrigin(0.5);
+  }
+
+  onRoundStart({ round, sequence }) {
+    this.sequence = sequence;
+    this.progress = 0;
+    this.locked = false;
+    this.roundText.setText(`ROUND ${round}`);
+    this.banner.setText('');
+    this.renderSeals();
+  }
+
+  // 인장 맺기 1회 (임시: 항상 맞는 것으로 처리). 인식기 붙으면 sealId 일치 검사로 교체.
+  handleSeal() {
+    if (this.locked || this.progress >= this.sequence.length) return;
+    this.progress += 1;
+    this.renderSeals();
+
+    if (this.progress >= this.sequence.length) {
+      this.locked = true; // 완성 후 서버 판정까지 입력 잠금
+      this.socket.emit(EVENTS.SEQ_COMPLETE, {}); // 타임스탬프는 서버 수신 시각
     }
+  }
+
+  renderSeals() {
+    this.sealRow.removeAll(true);
+    const n = this.sequence.length;
+    const boxW = 110, gap = 20;
+    const totalW = n * boxW + (n - 1) * gap;
+    const startX = (GAME.WIDTH - totalW) / 2 + boxW / 2;
+    const y = GAME.HEIGHT / 2;
+
+    this.sequence.forEach((sealId, i) => {
+      const done = i < this.progress;
+      const x = startX + i * (boxW + gap);
+      const box = this.add.rectangle(x, y, boxW, boxW, done ? 0x6c4bd6 : 0x2a2140)
+        .setStrokeStyle(3, done ? 0xb79dff : 0x4a3f66);
+      const seal = SEALS[sealId] ?? { kanji: '?', name: sealId };
+      const kanji = this.add.text(x, y - 12, seal.kanji, {
+        fontSize: '44px', color: done ? '#fff' : '#9a8bbf',
+      }).setOrigin(0.5);
+      const name = this.add.text(x, y + 34, seal.name, {
+        fontSize: '16px', color: done ? '#e8d8ff' : '#6a5d85',
+      }).setOrigin(0.5);
+      this.sealRow.add([box, kanji, name]);
+    });
+  }
+
+  onRoundResult({ winner, hp }) {
+    this.hp = hp;
+    this.drawHp();
+    const iWon = winner === this.myId;
+    this.banner.setText(iWon ? '술법 발동!' : '피격!').setColor(iWon ? '#8fffa0' : '#ff9a9a');
+    this.cameras.main.shake(200, iWon ? 0.002 : 0.006);
+  }
+
+  drawHp() {
+    const oppId = Object.keys(this.hp).find((id) => id !== this.myId);
+    const myHp = this.hp[this.myId] ?? RULES.MAX_HP;
+    const oppHp = this.hp[oppId] ?? RULES.MAX_HP;
+    const W = 460, H = 26, y = 64;
+
+    this.hpGfx.clear();
+    // 내 체력 (좌)
+    this.hpGfx.fillStyle(0x1a1030).fillRect(40, y, W, H);
+    this.hpGfx.fillStyle(0x4fc3ff).fillRect(40, y, W * (myHp / RULES.MAX_HP), H);
+    // 상대 체력 (우, 오른쪽 정렬로 줄어듦)
+    const rx = GAME.WIDTH - 40 - W;
+    this.hpGfx.fillStyle(0x1a1030).fillRect(rx, y, W, H);
+    const ow = W * (oppHp / RULES.MAX_HP);
+    this.hpGfx.fillStyle(0xff6b6b).fillRect(GAME.WIDTH - 40 - ow, y, ow, H);
+  }
+
+  onMatchOver({ winner }) {
+    this.locked = true;
+    this.scene.start('Result', { won: winner === this.myId });
   }
 }

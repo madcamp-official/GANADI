@@ -15,6 +15,7 @@ new Phaser.Game({
   width: GAME.WIDTH,
   height: GAME.HEIGHT,
   backgroundColor: '#1a1420',
+  dom: { createContainer: true }, // 로비 코드 입력/버튼 등 DOM 오버레이용
   scene: [
     BootScene,
     LobbyScene,
