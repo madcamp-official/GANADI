@@ -21,15 +21,15 @@ let running = false;
 let lastVideoTime = -1;
 let flashText = null, flashUntil = 0;
 
-// onSeal 발행 시 화면 플래시 + 로그 (이게 게임에서 데미지 이벤트가 될 자리)
-const recognizer = createRecognizer({
-  onSeal: (sealId, confidence) => {
-    flashText = nameOf(sealId);
-    flashUntil = performance.now() + 700;
-    firedEl.textContent = `최근 발동: ${nameOf(sealId)} (conf ${confidence.toFixed(2)})`;
-    console.log(`onSeal("${sealId}", ${confidence.toFixed(2)})`);
-  },
-});
+// B 계약대로: createRecognizer()는 async, onSeal은 프로퍼티로 꽂는다
+const recognizer = await createRecognizer();
+// 실제 게임에선 battleScene.attachRecognizer(recognizer)가 이 자리를 대신함
+recognizer.onSeal = (sealId, confidence, timestamp) => {
+  flashText = nameOf(sealId);
+  flashUntil = performance.now() + 700;
+  firedEl.textContent = `최근 발동: ${nameOf(sealId)} (conf ${confidence.toFixed(2)})`;
+  console.log(`onSeal("${sealId}", ${confidence.toFixed(2)}, ${timestamp})`);
+};
 
 function loop() {
   if (!running) return;
@@ -45,7 +45,7 @@ function loop() {
       drawHand(draw, hands[i], result.handednesses?.[i]?.[0]?.categoryName ?? "?");
     }
 
-    const { candidate, confidence } = recognizer.update(hands);
+    const { candidate, confidence } = recognizer.step(hands);
     candEl.textContent = candidate
       ? `후보: ${nameOf(candidate)} (conf ${confidence.toFixed(2)})`
       : "후보: —";
