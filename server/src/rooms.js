@@ -61,6 +61,12 @@ export function registerRoomHandlers(io, socket) {
     found.room.referee.onComplete(socket.id);
   });
 
+  // 상대 진행 상황 실시간 표시 — 서버는 중계만 (판정과 무관).
+  socket.on(EVENTS.OPP_PROGRESS, (payload) => {
+    const found = findRoomBySocket(socket.id);
+    if (found) socket.to(found.code).emit(EVENTS.OPP_PROGRESS, payload);
+  });
+
   // 화상용 PeerJS id 교환 (서버는 중계만, 영상은 P2P)
   socket.on(EVENTS.PEER_ID, ({ code, peerId }) => {
     socket.to(code).emit(EVENTS.PEER_ID, { peerId });

@@ -17,7 +17,8 @@ export default class BootScene extends Phaser.Scene {
     await this.requestCamera();
 
     hint.destroy();
-    this.scene.start('Lobby');
+    // 흐름: Boot → CharacterSelect → Calibration → Lobby → Battle → Result
+    this.scene.start('CharacterSelect');
   }
 
   // 웹캠 스트림 확보 → 로컬 프리뷰(#local-cam)에 표시 + registry에 저장.
