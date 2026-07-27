@@ -5,6 +5,7 @@ import { GAME } from './config.js';
 import BootScene from './scenes/BootScene.js';
 import LobbyScene from './scenes/LobbyScene.js';
 import CharacterSelectScene from './scenes/CharacterSelectScene.js';
+import HandCheckScene from './scenes/HandCheckScene.js';
 import CalibrationScene from './scenes/CalibrationScene.js';
 import BattleScene from './scenes/BattleScene.js';
 import ResultScene from './scenes/ResultScene.js';
@@ -20,6 +21,7 @@ new Phaser.Game({
     BootScene,
     LobbyScene,
     CharacterSelectScene,
+    HandCheckScene,
     CalibrationScene,
     BattleScene,
     ResultScene,
