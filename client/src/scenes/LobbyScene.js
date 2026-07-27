@@ -20,6 +20,12 @@ export default class LobbyScene extends Phaser.Scene {
       fontSize: '28px', color: '#7a6a95',
     }).setOrigin(0.5);
 
+    // 인장 도감 (12종 열람)
+    const codex = this.add.text(GAME.WIDTH - 24, 24, '📖 인장 도감', {
+      fontSize: '18px', color: '#c9b8ee', backgroundColor: '#2a2140', padding: { x: 14, y: 8 },
+    }).setOrigin(1, 0).setInteractive({ useHandCursor: true });
+    codex.on('pointerdown', () => this.scene.start('Codex'));
+
     // DOM 패널 (버튼 + 코드 입력)
     const panel = this.add.dom(GAME.WIDTH / 2, GAME.HEIGHT / 2 + 40).createFromHTML(`
       <div style="display:flex;flex-direction:column;gap:14px;align-items:center;
@@ -46,6 +52,11 @@ export default class LobbyScene extends Phaser.Scene {
         : `방 코드: ${code}  ·  상대를 기다리는 중…`;
     });
 
+    // 매치 정보(상대 캐릭터) 수신 → Battle에서 쓰도록 registry에 저장
+    this.socket.on(EVENTS.MATCH_INFO, ({ opponent }) => {
+      this.registry.set('opponentCharacter', opponent);
+    });
+
     this.isCreator = false;
     this.roomCode = null;
 
@@ -61,11 +72,13 @@ export default class LobbyScene extends Phaser.Scene {
     // 씬 종료 시 소켓 리스너 정리 (중복 등록 방지)
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.socket.off(EVENTS.ROOM_STATE);
+      this.socket.off(EVENTS.MATCH_INFO);
     });
   }
 
   createRoom() {
-    this.socket.emit(EVENTS.CREATE_ROOM, {}, ({ code }) => {
+    const character = this.registry.get('character');
+    this.socket.emit(EVENTS.CREATE_ROOM, { character }, ({ code }) => {
       this.isCreator = true;
       this.roomCode = code;
       this.status.textContent = `방 코드: ${code}  ·  상대를 기다리는 중…`;
@@ -78,7 +91,8 @@ export default class LobbyScene extends Phaser.Scene {
       this.status.textContent = '코드 4자리를 입력하세요';
       return;
     }
-    this.socket.emit(EVENTS.JOIN_ROOM, { code: clean }, (res) => {
+    const character = this.registry.get('character');
+    this.socket.emit(EVENTS.JOIN_ROOM, { code: clean, character }, (res) => {
       if (res?.error === 'NO_ROOM') this.status.textContent = '없는 방 코드입니다';
       else if (res?.error === 'FULL') this.status.textContent = '이미 꽉 찬 방입니다';
       else {

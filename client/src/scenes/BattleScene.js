@@ -97,16 +97,24 @@ export default class BattleScene extends Phaser.Scene {
     this.drawFighters();
   }
 
-  // 캐릭터 스프라이트 자리 — 지금은 색 아바타(플레이스홀더). 내 캐릭터는 선택값, 상대는 기본.
+  // 캐릭터 스프라이트 자리 — 색 아바타(플레이스홀더). 내 캐릭터·상대 캐릭터 모두 선택값 반영.
   drawFighters() {
     const me = getCharacter(this.registry.get('character'));
     const cy = GAME.HEIGHT / 2;
     // 내 캐릭터 (좌)
     this.add.rectangle(120, cy, 120, 150, me.color).setStrokeStyle(3, 0xffffff);
     this.add.text(120, cy + 95, me.name, { fontSize: '20px', color: '#fff' }).setOrigin(0.5);
-    // 상대 캐릭터 (우) — 캐릭터 교환은 이후 작업, 지금은 실루엣
-    this.add.rectangle(GAME.WIDTH - 120, cy, 120, 150, 0x3a2f55).setStrokeStyle(3, 0x6a5d85);
-    this.add.text(GAME.WIDTH - 120, cy + 95, '상대', { fontSize: '20px', color: '#9a8bbf' }).setOrigin(0.5);
+
+    // 상대 캐릭터 (우) — 매칭 시 교환받은 상대 캐릭터. 정보 없으면 실루엣.
+    const oppId = this.registry.get('opponentCharacter');
+    if (oppId) {
+      const opp = getCharacter(oppId);
+      this.add.rectangle(GAME.WIDTH - 120, cy, 120, 150, opp.color).setStrokeStyle(3, 0xffffff);
+      this.add.text(GAME.WIDTH - 120, cy + 95, opp.name, { fontSize: '20px', color: '#fff' }).setOrigin(0.5);
+    } else {
+      this.add.rectangle(GAME.WIDTH - 120, cy, 120, 150, 0x3a2f55).setStrokeStyle(3, 0x6a5d85);
+      this.add.text(GAME.WIDTH - 120, cy + 95, '상대', { fontSize: '20px', color: '#9a8bbf' }).setOrigin(0.5);
+    }
   }
 
   onRoundStart({ round, sequence }) {
@@ -161,6 +169,7 @@ export default class BattleScene extends Phaser.Scene {
 
     this.progress += 1;
     this.renderSeals();
+    this.spark(this.sealX(this.progress - 1), GAME.HEIGHT / 2, 0xb79dff); // 인장 확정 스파크
     // 상대 화면에 내 진행 상황 실시간 표시
     this.socket.emit(EVENTS.OPP_PROGRESS, { progress: this.progress, total: this.sequence.length });
 
@@ -199,7 +208,46 @@ export default class BattleScene extends Phaser.Scene {
     this.drawHp();
     const iWon = winner === this.myId;
     this.banner.setText(iWon ? '술법 발동!' : '피격!').setColor(iWon ? '#8fffa0' : '#ff9a9a');
-    this.cameras.main.shake(200, iWon ? 0.002 : 0.006);
+    this.cameras.main.shake(220, iWon ? 0.003 : 0.008);
+
+    if (iWon) {
+      // 내 술법이 상대에게 명중 → 상대 쪽에서 발동 연출
+      this.jutsu(GAME.WIDTH - 120, GAME.HEIGHT / 2, 0x8fffa0);
+    } else {
+      this.jutsu(120, GAME.HEIGHT / 2, 0xff6b6b);
+      this.flashRed();
+    }
+  }
+
+  // 시퀀스 인장의 i번째 화면 x좌표 (renderSeals 레이아웃과 동일)
+  sealX(i) {
+    const n = this.sequence.length;
+    const boxW = 110, gap = 20;
+    const totalW = n * boxW + (n - 1) * gap;
+    const startX = (GAME.WIDTH - totalW) / 2 + boxW / 2;
+    return startX + i * (boxW + gap);
+  }
+
+  // 파티클 버스트
+  spark(x, y, color) {
+    const e = this.add.particles(x, y, 'spark', {
+      speed: { min: 80, max: 260 }, lifespan: 500, scale: { start: 0.9, end: 0 },
+      tint: color, blendMode: 'ADD', emitting: false,
+    });
+    e.explode(16, x, y);
+    this.time.delayedCall(600, () => e.destroy());
+  }
+
+  // 술법 발동: 확산 링 + 큰 버스트
+  jutsu(x, y, color) {
+    this.spark(x, y, color);
+    const ring = this.add.image(x, y, 'ring').setTint(color).setScale(0.2).setAlpha(0.9).setBlendMode('ADD');
+    this.tweens.add({ targets: ring, scale: 2.4, alpha: 0, duration: 520, onComplete: () => ring.destroy() });
+  }
+
+  flashRed() {
+    const r = this.add.rectangle(GAME.WIDTH / 2, GAME.HEIGHT / 2, GAME.WIDTH, GAME.HEIGHT, 0xff0000, 0.35);
+    this.tweens.add({ targets: r, alpha: 0, duration: 350, onComplete: () => r.destroy() });
   }
 
   drawHp() {

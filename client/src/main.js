@@ -7,6 +7,7 @@ import LobbyScene from './scenes/LobbyScene.js';
 import CharacterSelectScene from './scenes/CharacterSelectScene.js';
 import HandCheckScene from './scenes/HandCheckScene.js';
 import CalibrationScene from './scenes/CalibrationScene.js';
+import CodexScene from './scenes/CodexScene.js';
 import BattleScene from './scenes/BattleScene.js';
 import ResultScene from './scenes/ResultScene.js';
 
@@ -23,6 +24,7 @@ new Phaser.Game({
     CharacterSelectScene,
     HandCheckScene,
     CalibrationScene,
+    CodexScene,
     BattleScene,
     ResultScene,
   ],
