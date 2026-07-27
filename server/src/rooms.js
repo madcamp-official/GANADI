@@ -50,8 +50,10 @@ export function registerRoomHandlers(io, socket) {
     if (room.players.length === 2) {
       console.log(`[room] ${code} 2인 매칭 완료 → 심판 시작`);
       const [p1, p2] = room.players;
-      io.to(p1).emit(EVENTS.MATCH_INFO, { opponent: room.characters[p2] });
-      io.to(p2).emit(EVENTS.MATCH_INFO, { opponent: room.characters[p1] });
+      // 방 전체로 브로드캐스트(io.to(code)는 확실히 전달됨). 각 클라가 자기 것 빼고 상대 걸 고른다.
+      const characters = { [p1]: room.characters[p1], [p2]: room.characters[p2] };
+      console.log(`[room] ${code} MATCH_INFO(room) →`, characters);
+      io.to(code).emit(EVENTS.MATCH_INFO, { characters });
 
       room.referee = createReferee(io, code, room.players, () => {
         rooms.delete(code); // 매치 종료 시 방 정리 (메모리 누수 방지·재대전은 새 방으로)
