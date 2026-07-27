@@ -1,74 +1,106 @@
 // ★ 교체 가능 모듈 계약 (§4.6) — 이 파일의 공개 인터페이스는 고정.
-// 내부 구현이 6종 룰 기반이든 12종 MLP든 무관하게 onSeal(sealId, confidence, timestamp)만 발행한다.
-// Day 5에 룰 기반 → MLP 교체가 "구현 함수만 바꾸는" 수준이 되도록 설계.
+// 내부 구현이 센트로이드든 12종 MLP든 이미지 CNN이든 무관하게 onSeal만 발행한다.
 //
 // ── A ↔ B 계약 (확정) ──
-//   onSeal(sealId, confidence, timestamp)
-//     sealId    : SEAL_IDS 문자열 ("horse" | "dog" | ...)  ← seals.js/constants.js
-//     confidence: 0~1
-//     timestamp : Date.now() (ms) — 확정 시각. 서버 승부는 SEQ_COMPLETE 수신 순서로
-//                 판정하므로 게임엔 참고용이지만, 계약상 항상 함께 넘긴다.
-//   방향: A(인식기)가 부른다 ← B가 만든 함수를 recognizer.onSeal에 꽂는다.
+//   createRecognizer()                     : async. 인자 없음
+//   rec.step({ video, hands, nowMs })      : A의 프레임 루프가 매 프레임 호출
+//        video  : HTMLVideoElement. 지금 구현은 안 쓴다.
+//                 → 나중에 이미지 모델(CNN)이 픽셀을 볼 자리를 미리 비워둔 것.
+//                   (이미지 모델도 hands로 손 위치를 잡아 잘라낸 뒤 CNN에 넣으므로 둘 다 필요)
+//        hands  : MediaPipe landmarks 배열 [손][21]. ★ landmarker는 인식기가 아니라
+//                 호출자(A의 루프)가 소유한다 — 인스턴스를 1대로 유지하기 위해.
+//        nowMs  : performance.now()
+//     반환 { candidate, confirmed, confidence, holdProgress }
+//        candidate    : 다수결 통과한 현재 후보 (없으면 null)
+//        confirmed    : 홀드까지 끝나 확정된 인장 (없으면 null)
+//        holdProgress : 0~1. B가 인식 게이지 바를 그리는 값
+//   rec.onSeal(sealId, confidence, timestamp) : 인장 확정 시 1회 발행 (엣지 트리거)
+//        sealId    : SEAL_IDS 문자열 ("horse" | "dog" | ...)
+//        confidence: 0~1
+//        timestamp : Date.now() (ms)
+//   방향: B가 만든 함수를 rec.onSeal에 꽂는다 (BattleScene.attachRecognizer).
+//
+// ※ 인자·반환을 객체로 묶은 이유: 나중에 필드가 늘어도 호출부가 안 깨진다.
 
-import { createHandLandmarker } from './handLandmarker.js';
 import { extractFeatures } from './features.js';
 import { classifyRuleBased } from './ruleBased.js';
 // import { classifyMLP } from './mlpModel.js'; // Day 5 교체 대상
 import { RECOGNITION } from '../config.js';
+import { RULES } from '../../../shared/constants.js';
 
-const USE_MLP = false; // Day 5에 true로. 폴백 플래그로 룰 기반 유지 (§4.6).
+const USE_MLP = false; // Day 5에 true로. 폴백 플래그로 기존 구현 유지 (§4.6).
+
+/**
+ * 한 프레임 판별 — 상태 없는 순수 함수.
+ * ★ export를 유지할 것: 웹캠 없이 저장된 데이터(data.json의 원시 landmarks)를
+ *   그대로 흘려보내 정확도를 뽑는 통로다. Step 4 검증·Day 4 혼동행렬이 이걸로 돌아간다.
+ * 임계값·런너업 마진 판정은 분류기 안에서 끝내고, 여기선 {sealId, confidence}만 돌려준다.
+ * @param {Array<Array<{x:number,y:number,z:number}>>} hands
+ * @returns {{ sealId: string|null, confidence: number }}
+ */
+export function classify(hands) {
+  if (!hands?.length) return { sealId: null, confidence: 0 };
+  const feat = extractFeatures(hands);
+  const { sealId, confidence } = USE_MLP
+    ? { sealId: null, confidence: 0 } // TODO: classifyMLP(feat)
+    : classifyRuleBased(feat);
+  return { sealId: sealId ?? null, confidence: confidence ?? 0 };
+}
 
 export async function createRecognizer() {
-  const landmarker = await createHandLandmarker();
-  const voteBuffer = [];
+  const votes = [];
+  let holdSeal = null;
+  let holdStart = 0;
+  let fired = null; // 엣지 트리거: 같은 홀드에서 두 번 발행되는 것 방지
 
-  /** @type {(sealId: string, confidence: number, timestamp: number) => void} */
-  let onSeal = () => {};
-  let heldSeal = null;
-  let heldSince = 0;
+  const rec = {
+    onSeal: null, // B가 여기에 게임 함수를 꽂는다
 
-  function step(videoFrame, nowMs) {
-    const result = landmarker.detectForVideo(videoFrame, nowMs);
-    if (!result?.landmarks?.length) return;
+    step({ video, hands, nowMs }) {
+      void video; // 지금 구현은 픽셀을 안 본다 (이미지 모델용 자리)
 
-    const feat = extractFeatures(result.landmarks);
-    const { sealId, confidence, runnerUp } = USE_MLP
-      ? { sealId: null, confidence: 0, runnerUp: 0 } // TODO: classifyMLP(feat)
-      : classifyRuleBased(feat);
+      const { sealId, confidence } = classify(hands);
 
-    // 런너업 마진: 1등이 2등보다 충분히 높을 때만 후보 인정 (§4.2)
-    if (!sealId || confidence - runnerUp < RECOGNITION.RUNNER_UP_MARGIN) return;
+      // 시간축 다수결 (§4.4) — 단발 오인식 제거
+      votes.push(sealId ?? NONE);
+      if (votes.length > RECOGNITION.VOTE_WINDOW) votes.shift();
+      const winner = majority(votes);
 
-    // 시간축 다수결 (§4.4)
-    voteBuffer.push(sealId);
-    if (voteBuffer.length > RECOGNITION.VOTE_WINDOW) voteBuffer.shift();
-    const voted = majority(voteBuffer);
-
-    // 0.4초 홀드 확정
-    if (voted === heldSeal) {
-      if (nowMs - heldSince >= 400) {
-        onSeal(voted, confidence, Date.now()); // 계약: (sealId, confidence, timestamp)
-        heldSeal = null; // 재확정 방지 (다음 프레임에서 새로 홀드)
+      // 홀드 + 엣지 트리거
+      if (winner !== holdSeal) {
+        holdSeal = winner;
+        holdStart = nowMs;
+        fired = null;
       }
-    } else {
-      heldSeal = voted;
-      heldSince = nowMs;
-    }
-  }
 
-  return {
-    step,
-    set onSeal(fn) { onSeal = fn; },
+      const held = holdSeal ? nowMs - holdStart : 0;
+      const holdProgress = holdSeal ? Math.min(1, held / RULES.SEAL_HOLD_MS) : 0;
+
+      let confirmed = null;
+      if (holdSeal && held >= RULES.SEAL_HOLD_MS) {
+        confirmed = holdSeal;
+        if (fired !== confirmed) {
+          fired = confirmed;
+          rec.onSeal?.(confirmed, confidence, Date.now()); // 계약대로 발행
+        }
+      }
+
+      return { candidate: winner, confirmed, confidence, holdProgress };
+    },
   };
+
+  return rec;
 }
+
+const NONE = '__none__'; // "인장 아님"도 한 표로 세야 다수결이 제대로 돈다
 
 function majority(arr) {
   const count = {};
-  let best = null;
+  let best = NONE;
   let bestN = 0;
   for (const x of arr) {
     count[x] = (count[x] ?? 0) + 1;
     if (count[x] > bestN) { bestN = count[x]; best = x; }
   }
-  return best;
+  return best === NONE ? null : best;
 }

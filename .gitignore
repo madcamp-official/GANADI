@@ -7,8 +7,11 @@ build/
 *.log
 .DS_Store
 Day1_A.md
+Day2_A.md
+Day2.md
 # 수집된 학습 데이터 / 모델 (용량 큼 — 별도 관리)
-data/
+# ★ 반드시 선행 슬래시 — 없으면 client/src/data/ 등 하위 data 폴더까지 통째로 무시된다
+/data/
 *.tfmodel
 
 # 개인 작업 체크리스트 (커밋 안 함)
