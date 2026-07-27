@@ -23,28 +23,27 @@
 // ※ 인자·반환을 객체로 묶은 이유: 나중에 필드가 늘어도 호출부가 안 깨진다.
 
 import { extractFeatures } from './features.js';
-import { classifyRuleBased } from './ruleBased.js';
+import { classifyCentroid } from './classifyCentroid.js';
 // import { classifyMLP } from './mlpModel.js'; // Day 5 교체 대상
 import { RECOGNITION } from '../config.js';
 import { RULES } from '../../../shared/constants.js';
 
-const USE_MLP = false; // Day 5에 true로. 폴백 플래그로 기존 구현 유지 (§4.6).
+const USE_MLP = false; // Day 5에 true로. 폴백 플래그로 센트로이드 구현 유지 (§4.6).
 
 /**
  * 한 프레임 판별 — 상태 없는 순수 함수.
  * ★ export를 유지할 것: 웹캠 없이 저장된 데이터(data.json의 원시 landmarks)를
  *   그대로 흘려보내 정확도를 뽑는 통로다. Step 4 검증·Day 4 혼동행렬이 이걸로 돌아간다.
- * 임계값·런너업 마진 판정은 분류기 안에서 끝내고, 여기선 {sealId, confidence}만 돌려준다.
+ * 임계값·런너업 마진 판정은 분류기 안에서 끝난다. best/second/reason은 튜닝용 진단 정보.
  * @param {Array<Array<{x:number,y:number,z:number}>>} hands
- * @returns {{ sealId: string|null, confidence: number }}
+ * @returns {{ sealId: string|null, confidence: number, reason?: string }}
  */
 export function classify(hands) {
-  if (!hands?.length) return { sealId: null, confidence: 0 };
+  if (!hands?.length) return { sealId: null, confidence: 0, reason: 'no-hands' };
   const feat = extractFeatures(hands);
-  const { sealId, confidence } = USE_MLP
-    ? { sealId: null, confidence: 0 } // TODO: classifyMLP(feat)
-    : classifyRuleBased(feat);
-  return { sealId: sealId ?? null, confidence: confidence ?? 0 };
+  return USE_MLP
+    ? { sealId: null, confidence: 0, reason: 'mlp-todo' } // TODO: classifyMLP(feat)
+    : classifyCentroid(feat);
 }
 
 export async function createRecognizer() {

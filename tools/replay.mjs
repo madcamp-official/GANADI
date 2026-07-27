@@ -13,12 +13,15 @@
 //   ① 센트로이드를 만든 바로 그 데이터로 채점하면 당연히 잘 나온다 (train셋 채점)
 //   ② 수집 데이터엔 "인장 아님" 샘플이 없다 → 임계값을 올렸을 때의 오인식 위험은
 //      여기서 안 보인다. 실제 손으로 아무 포즈나 취해봐야 알 수 있다.
-// ⚠️ --accept/--margin 기본값은 recognizer.js의 상수와 맞춰둔 것. 거기를 고치면 여기도 맞출 것.
+// 이 도구는 게임이 실제로 쓰는 코드(client/src/recognition/)를 그대로 import한다.
+// 임계값 기본값도 client/src/config.js에서 읽으므로, 게임을 튜닝하면 여기 숫자도 같이 움직인다.
+// (config.js가 node에서 import되도록 import.meta.env에 `?.`를 쓴 이유가 이것)
 
 import { readFileSync, readdirSync, statSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
-import { buildFeatures } from '../hand-test/js/features.js';
-import { CENTROIDS } from '../hand-test/js/centroids.js';
+import { extractFeatures as buildFeatures } from '../client/src/recognition/features.js';
+import { CENTROIDS } from '../client/src/recognition/centroids.js';
+import { RECOGNITION } from '../client/src/config.js';
 
 // --- 인자 파싱 ---
 const args = process.argv.slice(2);
@@ -26,8 +29,9 @@ const opt = (name, dflt) => {
   const hit = args.find((a) => a.startsWith(`--${name}=`));
   return hit ? Number(hit.split('=')[1]) : dflt;
 };
-const ACCEPT = opt('accept', 2.5); // 가장 가까운 센트로이드까지 이 거리보다 멀면 "인장 아님"
-const MARGIN = opt('margin', 1.0); // 1등이 2등보다 이만큼 더 가까워야 인정 (런너업 마진, §4.2)
+// 기본값은 게임이 쓰는 config.js 그대로 (--accept/--margin으로 실험만 덮어씀)
+const ACCEPT = opt('accept', RECOGNITION.ACCEPT_THRESHOLD);
+const MARGIN = opt('margin', RECOGNITION.MARGIN);
 const SWEEP = args.includes('--sweep');
 const paths = args.filter((a) => !a.startsWith('--'));
 

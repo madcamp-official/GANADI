@@ -1,9 +1,11 @@
-// 손 인식 준비 관문 (B 작업, A의 CalibrationScene과 분리).
-// 두 손바닥을 펴고 잠깐 유지하면 준비 완료 → 로비.
-// 손 인식(MediaPipe)은 브라우저에서 수행. 이 씬이 곧 "인식이 이 환경에서 되는지" 점검.
+// 손 인식 준비 관문. 두 손바닥을 펴고 잠깐 유지하면 준비 완료 → 로비.
+// 이 씬이 곧 "인식이 이 환경에서 되는지" 점검이자, 손 추적 루프를 처음 띄우는 지점이다.
+//
+// ★ landmarker를 직접 만들지 않는다 — handTracker 하나만 쓴다 (Step 1 결정).
+//   여기서 만들어진 루프는 씬이 바뀌어도 계속 돌고, 대전 씬은 registry로 인식기를 집어간다.
 
 import Phaser from 'phaser';
-import { createHandLandmarker } from '../recognition/handLandmarker.js';
+import { getHandTracker } from '../recognition/handTracker.js';
 import { GAME } from '../config.js';
 
 const HOLD_MS = 1000; // 두 손바닥 유지 시간
@@ -14,11 +16,10 @@ export default class HandCheckScene extends Phaser.Scene {
   }
 
   async create() {
-    this.landmarker = null;
     this.ready = false;
     this.holdMs = 0;
-    this.lastVideoTime = -1;
-    this.video = document.getElementById('local-cam');
+    this.lastFrameMs = null;
+    this.unsubscribe = null;
 
     this.add.text(GAME.WIDTH / 2, 70, '준비', {
       fontSize: '44px', fontStyle: 'bold', color: '#e8d8ff',
@@ -52,35 +53,43 @@ export default class HandCheckScene extends Phaser.Scene {
     }).setOrigin(0.5).setInteractive({ useHandCursor: true });
     this.skip.on('pointerdown', () => this.goNext());
 
-    if (!this.video?.srcObject) {
+    // 씬을 벗어나도 추적 루프는 계속 돈다 — 구독만 끊는다
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      this.unsubscribe?.();
+      this.unsubscribe = null;
+    });
+
+    const video = document.getElementById('local-cam');
+    if (!video?.srcObject) {
       this.status.setText('⚠ 웹캠이 없어요 — 카메라 권한을 허용해주세요').setColor('#ff9a9a');
       return;
     }
 
     try {
-      this.landmarker = await createHandLandmarker();
+      const tracker = await getHandTracker(video);
+      if (!this.scene.isActive()) return; // 로딩 중 씬을 떠났으면 구독하지 않는다
+
+      // ★ 대전 씬이 registry.get('recognizer')로 집어간다 (BattleScene.attachRecognizer)
+      this.registry.set('recognizer', tracker.recognizer);
+      this.registry.set('handTracker', tracker);
+
       this.status.setText('두 손바닥을 펴세요');
+      this.unsubscribe = tracker.onFrame((frame) => this.onFrame(frame));
     } catch (e) {
       console.warn('[handcheck] 인식기 로드 실패:', e);
       this.status.setText('⚠ 인식기 로드 실패 — 건너뛰기로 진행하세요').setColor('#ff9a9a');
     }
-
-    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => { this.landmarker = null; });
   }
 
-  update(_time, delta) {
-    if (!this.landmarker || this.ready || !this.video) return;
-    if (this.video.currentTime === this.lastVideoTime) return;
-    this.lastVideoTime = this.video.currentTime;
+  // 추적 루프가 매 프레임 호출. 홀드 시간은 프레임 타임스탬프 차이로 잰다
+  // (Phaser update의 delta를 쓰면 추론이 안 돈 프레임까지 세어 실제보다 빨리 찬다).
+  onFrame({ hands, nowMs }) {
+    if (this.ready) return;
 
-    let openCount = 0;
-    try {
-      const res = this.landmarker.detectForVideo(this.video, performance.now());
-      const hands = res?.landmarks ?? [];
-      openCount = hands.filter(isOpenPalm).length;
-    } catch {
-      return;
-    }
+    const delta = this.lastFrameMs == null ? 0 : nowMs - this.lastFrameMs;
+    this.lastFrameMs = nowMs;
+
+    const openCount = hands.filter(isOpenPalm).length;
 
     if (openCount >= 2) {
       this.holdMs = Math.min(HOLD_MS, this.holdMs + delta);
