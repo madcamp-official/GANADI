@@ -1,8 +1,10 @@
-// 캐릭터 선택 (4종, 스탯 동일·스킨만 차이). 선택하면 registry에 저장 후 캘리브레이션으로.
+// 캐릭터 선택 (4종, 스탯 동일·스킨만). 선택 후 registry 저장 → 손 인식 관문(HandCheck).
+// 디자인: docs/design/01-character-select.png
 
 import Phaser from 'phaser';
-import { CHARACTERS } from '../data/characters.js';
+import { CHARACTERS, spriteKey } from '../data/characters.js';
 import { GAME } from '../config.js';
+import { drawForest, panel, button, inkStamp, pill, CSS, C, hiDPI } from '../ui/theme.js';
 
 export default class CharacterSelectScene extends Phaser.Scene {
   constructor() {
@@ -10,62 +12,87 @@ export default class CharacterSelectScene extends Phaser.Scene {
   }
 
   create() {
-    this.add.text(GAME.WIDTH / 2, 90, '캐릭터 선택', {
-      fontSize: '48px', fontStyle: 'bold', color: '#e8d8ff',
+    hiDPI(this);
+    const W = GAME.WIDTH;
+    drawForest(this);
+
+    // 타이틀 패널 + 印
+    panel(this, W / 2 - 24, 70, 300, 74, { radius: 12 });
+    this.add.text(W / 2 - 54, 70, '캐릭터 선택', {
+      fontSize: '34px', fontStyle: 'bold', color: CSS.outline,
     }).setOrigin(0.5);
-    this.add.text(GAME.WIDTH / 2, 145, '스탯은 모두 동일 — 마음에 드는 닌자를 골라라', {
-      fontSize: '18px', color: '#7a6a95',
+    inkStamp(this, W / 2 + 92, 70, 40);
+    this.add.text(W / 2, 130, '스탯은 모두 같아요 — 마음에 드는 가나디를 고르세요', {
+      fontSize: '17px', color: CSS.sun,
     }).setOrigin(0.5);
 
-    const cardW = 200, cardH = 260, gap = 40;
-    const n = CHARACTERS.length;
-    const totalW = n * cardW + (n - 1) * gap;
-    const startX = (GAME.WIDTH - totalW) / 2 + cardW / 2;
-    const y = GAME.HEIGHT / 2 + 20;
+    // 4장 카드
+    const cardW = 260, cardH = 420, gap = 32;
+    const totalW = CHARACTERS.length * cardW + (CHARACTERS.length - 1) * gap;
+    const startX = (W - totalW) / 2 + cardW / 2;
+    const cy = 400;
 
-    this.cards = [];
     this.selectedId = null;
+    this.cards = [];
 
     CHARACTERS.forEach((ch, i) => {
-      const x = startX + i * (cardW + gap);
-      const card = this.add.container(x, y);
+      const cx = startX + i * (cardW + gap);
+      const g = panel(this, cx, cy, cardW, cardH, { radius: 14 });
+      this.add.text(cx, cy - cardH / 2 + 40, `${ch.name} · ${ch.element}`, {
+        fontSize: '24px', fontStyle: 'bold', color: CSS.outline,
+      }).setOrigin(0.5);
+      const spr = this.add.image(cx, cy - 20, spriteKey(ch.id));
+      fitSprite(spr, 190, 230);
+      this.add.text(cx, cy + cardH / 2 - 54, ch.desc, {
+        fontSize: '15px', color: '#6a5535', align: 'center',
+        wordWrap: { width: cardW - 40 },
+      }).setOrigin(0.5);
 
-      const bg = this.add.rectangle(0, 0, cardW, cardH, 0x2a2140)
-        .setStrokeStyle(3, 0x4a3f66).setInteractive({ useHandCursor: true });
-      const avatar = this.add.rectangle(0, -40, 120, 120, ch.color).setStrokeStyle(2, 0xffffff);
-      const name = this.add.text(0, 55, ch.name, { fontSize: '28px', color: '#fff' }).setOrigin(0.5);
-      const elem = this.add.text(0, 95, ch.element, { fontSize: '18px', color: '#c9b8ee' }).setOrigin(0.5);
+      // 선택 강조용 테두리 + 배지 (처음엔 숨김)
+      const hi = this.add.graphics().setVisible(false);
+      hi.lineStyle(6, C.orange, 1).strokeRoundedRect(cx - cardW / 2, cy - cardH / 2, cardW, cardH, 14);
+      const badge = inkStamp(this, cx + cardW / 2 - 18, cy - cardH / 2 - 6, 44);
+      badge.g.setVisible(false); badge.t.setVisible(false);
 
-      card.add([bg, avatar, name, elem]);
-      card.setData('id', ch.id);
-      card.setData('bg', bg);
-      this.cards.push(card);
-
-      bg.on('pointerover', () => { if (this.selectedId !== ch.id) bg.setStrokeStyle(3, 0x8a7ab5); });
-      bg.on('pointerout', () => { if (this.selectedId !== ch.id) bg.setStrokeStyle(3, 0x4a3f66); });
-      bg.on('pointerdown', () => this.select(ch.id));
+      const zone = this.add.zone(cx, cy, cardW, cardH).setInteractive({ useHandCursor: true });
+      zone.on('pointerdown', () => this.select(ch.id));
+      this.cards.push({ id: ch.id, hi, badge });
     });
 
-    this.confirmBtn = this.add.text(GAME.WIDTH / 2, GAME.HEIGHT - 60, '선택 완료', {
-      fontSize: '26px', color: '#6a5d85', backgroundColor: '#241c36',
-      padding: { x: 32, y: 12 },
-    }).setOrigin(0.5);
+    // 하단: 고른 닌자 pill + 선택 완료 버튼
+    this.chosenPill = pill(this, W / 2 - 170, GAME.HEIGHT - 54, '닌자를 고르세요', { fill: 0x2a3a2b });
+    this.confirm = button(this, W / 2 + 90, GAME.HEIGHT - 54, 260, 62, '선택 완료', { color: C.scrollDark, fontSize: '24px' });
+    this.confirm.zone.disableInteractive();
+    this.confirm.t.setColor('#9a8a6a');
   }
 
   select(id) {
     this.selectedId = id;
+    console.log('[select] 내 캐릭터 선택 =', id);
+    this.registry.set('character', id);
+    const ch = CHARACTERS.find((c) => c.id === id);
+
     this.cards.forEach((card) => {
-      const bg = card.getData('bg');
-      const on = card.getData('id') === id;
-      bg.setStrokeStyle(on ? 4 : 3, on ? 0xb79dff : 0x4a3f66);
-      bg.setFillStyle(on ? 0x3a2f55 : 0x2a2140);
+      const on = card.id === id;
+      card.hi.setVisible(on);
+      card.badge.g.setVisible(on); card.badge.t.setVisible(on);
     });
 
-    // 선택 저장 + 진행 버튼 활성화
-    this.registry.set('character', id);
-    this.confirmBtn.setColor('#fff').setBackgroundColor('#6c4bd6')
-      .setInteractive({ useHandCursor: true })
-      .off('pointerdown')
+    this.chosenPill.t.setText(`고른 닌자  ${ch.name} · ${ch.element}`);
+    // 확인 버튼 활성화
+    this.confirm.g.clear();
+    const w = 260, h = 62, x = GAME.WIDTH / 2 + 90 - w / 2, y = GAME.HEIGHT - 54 - h / 2;
+    this.confirm.g.fillStyle(C.woodShadow, 1).fillRoundedRect(x, y + 6, w, h, 10);
+    this.confirm.g.fillStyle(C.scroll, 1).fillRoundedRect(x, y, w, h, 10);
+    this.confirm.g.lineStyle(4, C.orange, 1).strokeRoundedRect(x, y, w, h, 10);
+    this.confirm.t.setColor(CSS.outline);
+    this.confirm.zone.setInteractive({ useHandCursor: true }).off('pointerdown')
       .on('pointerdown', () => this.scene.start('HandCheck'));
   }
+}
+
+// 스프라이트를 박스 안에 비율 유지로 맞춤
+function fitSprite(spr, maxW, maxH) {
+  const s = Math.min(maxW / spr.width, maxH / spr.height);
+  spr.setScale(s);
 }

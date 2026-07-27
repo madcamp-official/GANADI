@@ -3,13 +3,17 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>인술대전</title>
+    <title>나루도</title>
     <style>
-      body { margin: 0; background: #1a1420; overflow: hidden; }
-      #game { display: block; }
-      /* 상대/내 웹캠 프리뷰 — Phaser 캔버스 옆 DOM에 표시 (판정 미사용) */
-      #video-layer { position: fixed; top: 8px; right: 8px; display: flex; gap: 8px; }
-      #video-layer video { width: 160px; border-radius: 8px; background: #000; }
+      html, body { height: 100%; }
+      body { margin: 0; background: #16281c; overflow: hidden; }
+      /* 게임 캔버스가 뷰포트를 꽉 채움. 중앙 정렬은 Phaser autoCenter가 담당 (CSS flex 중복 금지) */
+      #game { width: 100vw; height: 100vh; }
+      /* 상대/내 웹캠 프리뷰 — 캔버스 위 DOM 오버레이 (판정 미사용) */
+      #video-layer { position: fixed; top: 10px; right: 10px; display: flex; gap: 8px; z-index: 10; }
+      #video-layer video { width: 150px; border-radius: 8px; background: #000; box-shadow: 0 2px 8px rgba(0,0,0,.4); }
+      /* 상대 캠은 대전 씬에서만 표시 (BattleScene이 켬) */
+      #remote-cam { display: none; }
     </style>
   </head>
   <body>

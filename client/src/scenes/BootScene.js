@@ -1,6 +1,8 @@
 // 에셋 로드 + 웹캠 권한 요청. 완료되면 로비로.
 
 import Phaser from 'phaser';
+import { CHARACTERS, spriteKey } from '../data/characters.js';
+import { hiDPI } from '../ui/theme.js';
 
 export default class BootScene extends Phaser.Scene {
   constructor() {
@@ -8,10 +10,12 @@ export default class BootScene extends Phaser.Scene {
   }
 
   preload() {
-    // TODO: 인장 아이콘, 캐릭터 스프라이트, 이펙트, 사운드 로드.
+    // 가나디 캐릭터 스프라이트 (client/public/characters/ganadi-<id>.png)
+    CHARACTERS.forEach((c) => this.load.image(spriteKey(c.id), `/characters/ganadi-${c.id}.png`));
   }
 
   async create() {
+    hiDPI(this);
     this.makeParticleTextures();
 
     const hint = this.add.text(40, 40, '웹캠 권한을 허용해주세요…', { fontSize: '24px' });
