@@ -5,6 +5,7 @@
 import Phaser from 'phaser';
 import { EVENTS, RULES } from '../../../shared/constants.js';
 import { SEALS } from '../data/seals.js';
+import { getCharacter } from '../data/characters.js';
 import { getSocket } from '../net/socket.js';
 import { startVideoCall } from '../net/webrtc.js';
 import { GAME } from '../config.js';
@@ -28,6 +29,7 @@ export default class BattleScene extends Phaser.Scene {
     // 서버 이벤트
     this.socket.on(EVENTS.ROUND_START, (p) => this.onRoundStart(p));
     this.socket.on(EVENTS.ROUND_RESULT, (p) => this.onRoundResult(p));
+    this.socket.on(EVENTS.OPP_PROGRESS, ({ progress, total }) => this.drawOppProgress(progress, total));
     this.socket.once(EVENTS.MATCH_OVER, (p) => this.onMatchOver(p));
 
     // A의 인식기 붙이기 — A가 부팅 시 registry에 넣어둔 recognizer를 집어 연결.
@@ -54,6 +56,7 @@ export default class BattleScene extends Phaser.Scene {
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.socket.off(EVENTS.ROUND_START);
       this.socket.off(EVENTS.ROUND_RESULT);
+      this.socket.off(EVENTS.OPP_PROGRESS);
       this.video?.stop();
       // 죽은 씬으로 인식 이벤트가 흘러들지 않게 콜백 해제 (A의 step 루프는 계속 돎)
       if (this.recognizer) this.recognizer.onSeal = () => {};
@@ -71,6 +74,11 @@ export default class BattleScene extends Phaser.Scene {
     this.hpGfx = this.add.graphics();
     this.drawHp();
 
+    // 상대 진행 표시 (OPP_PROGRESS 수신 → 갱신)
+    this.oppProgText = this.add.text(GAME.WIDTH - 40, 100, '상대 진행: 0/0', {
+      fontSize: '18px', color: '#ffb3b3',
+    }).setOrigin(1, 0);
+
     this.roundText = this.add.text(GAME.WIDTH / 2, 40, '', {
       fontSize: '20px', color: '#c9b8ee',
     }).setOrigin(0.5);
@@ -85,15 +93,54 @@ export default class BattleScene extends Phaser.Scene {
     this.banner = this.add.text(GAME.WIDTH / 2, GAME.HEIGHT / 2 - 140, '', {
       fontSize: '40px', fontStyle: 'bold', color: '#fff',
     }).setOrigin(0.5);
+
+    this.drawFighters();
+  }
+
+  // 캐릭터 스프라이트 자리 — 지금은 색 아바타(플레이스홀더). 내 캐릭터는 선택값, 상대는 기본.
+  drawFighters() {
+    const me = getCharacter(this.registry.get('character'));
+    const cy = GAME.HEIGHT / 2;
+    // 내 캐릭터 (좌)
+    this.add.rectangle(120, cy, 120, 150, me.color).setStrokeStyle(3, 0xffffff);
+    this.add.text(120, cy + 95, me.name, { fontSize: '20px', color: '#fff' }).setOrigin(0.5);
+    // 상대 캐릭터 (우) — 캐릭터 교환은 이후 작업, 지금은 실루엣
+    this.add.rectangle(GAME.WIDTH - 120, cy, 120, 150, 0x3a2f55).setStrokeStyle(3, 0x6a5d85);
+    this.add.text(GAME.WIDTH - 120, cy + 95, '상대', { fontSize: '20px', color: '#9a8bbf' }).setOrigin(0.5);
   }
 
   onRoundStart({ round, sequence }) {
     this.sequence = sequence;
     this.progress = 0;
-    this.locked = false;
+    this.locked = true; // 카운트다운 동안 입력 잠금
     this.roundText.setText(`ROUND ${round}`);
-    this.banner.setText('');
     this.renderSeals();
+    this.drawOppProgress(0, sequence.length);
+    this.startCountdown();
+  }
+
+  // 3·2·1·시작! 후 입력 개시. 양쪽이 같은 ROUND_START를 받아 동시에 시작.
+  startCountdown() {
+    const steps = ['3', '2', '1', '시작!'];
+    let i = 0;
+    const tick = () => {
+      this.banner.setText(steps[i]).setColor('#ffe08a');
+      this.tweens.add({ targets: this.banner, scale: { from: 1.5, to: 1 }, duration: 300 });
+      i += 1;
+      if (i < steps.length) {
+        this.time.delayedCall(650, tick);
+      } else {
+        this.time.delayedCall(450, () => {
+          this.banner.setText('').setScale(1);
+          this.locked = false;
+        });
+      }
+    };
+    tick();
+  }
+
+  drawOppProgress(progress, total) {
+    this.oppProgText.setText(`상대 진행: ${progress}/${total}`);
   }
 
   // ── A ↔ B 계약 연결 지점 ──
@@ -114,6 +161,8 @@ export default class BattleScene extends Phaser.Scene {
 
     this.progress += 1;
     this.renderSeals();
+    // 상대 화면에 내 진행 상황 실시간 표시
+    this.socket.emit(EVENTS.OPP_PROGRESS, { progress: this.progress, total: this.sequence.length });
 
     if (this.progress >= this.sequence.length) {
       this.locked = true; // 완성 후 서버 판정까지 입력 잠금
