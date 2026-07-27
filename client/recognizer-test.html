@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <title>인장 인식기 테스트 (client 구현)</title>
+    <style>
+      * { box-sizing: border-box; }
+      body {
+        margin: 0; background: #1a1420; color: #e8d8ff;
+        font-family: system-ui, sans-serif; display: flex; gap: 16px; padding: 16px;
+      }
+      #stage { position: relative; width: 640px; height: 480px; flex: none; }
+      #video, #overlay { position: absolute; inset: 0; width: 640px; height: 480px; border-radius: 10px; }
+      #video { object-fit: cover; background: #000; transform: scaleX(-1); }
+      #overlay { transform: scaleX(-1); }
+      #panel { flex: 1; min-width: 320px; max-width: 520px; }
+      h1 { font-size: 18px; margin: 0 0 4px; }
+      .sub { color: #7a6a95; font-size: 13px; margin-bottom: 14px; }
+      button {
+        padding: 10px 18px; border: none; border-radius: 8px; cursor: pointer;
+        background: #6c4bd6; color: #fff; font-size: 15px; font-weight: 600;
+      }
+      button:disabled { background: #3a2f55; cursor: default; }
+      .card { background: #241c36; border-radius: 10px; padding: 12px 14px; margin-top: 12px; }
+      .label { color: #7a6a95; font-size: 12px; text-transform: uppercase; letter-spacing: .5px; }
+      .big { font-size: 30px; font-weight: 700; margin: 2px 0; }
+      .gauge { height: 14px; background: #1a1030; border-radius: 7px; overflow: hidden; margin-top: 8px; }
+      .gauge > div { height: 100%; width: 0; background: #8fffa0; transition: width .05s linear; }
+      table { width: 100%; border-collapse: collapse; font-size: 13px; }
+      td { padding: 3px 0; }
+      td:last-child { text-align: right; font-variant-numeric: tabular-nums; color: #c9b8ee; }
+      .win { color: #8fffa0; font-weight: 700; }
+      .slider { display: flex; align-items: center; gap: 10px; margin: 8px 0; font-size: 13px; }
+      .slider input { flex: 1; }
+      .slider b { width: 42px; text-align: right; font-variant-numeric: tabular-nums; }
+      #log { font-size: 12px; color: #9a8bbf; max-height: 130px; overflow-y: auto; line-height: 1.7; }
+      .reason { font-size: 12px; color: #ffb3b3; min-height: 16px; }
+    </style>
+  </head>
+  <body>
+    <div id="stage">
+      <video id="video" autoplay playsinline muted></video>
+      <canvas id="overlay" width="640" height="480"></canvas>
+    </div>
+
+    <div id="panel">
+      <h1>인장 인식기 테스트</h1>
+      <div class="sub">
+        client/src/recognition/ 의 실제 게임 코드를 그대로 돌립니다.
+        (features → classifyCentroid → recognizer)
+      </div>
+      <button id="start">▶ 웹캠 시작</button>
+
+      <div class="card">
+        <div class="label">확정된 인장 (onSeal)</div>
+        <div class="big" id="fired">—</div>
+        <div class="label" style="margin-top:10px">현재 후보 · 홀드</div>
+        <div class="big" id="candidate" style="font-size:22px">—</div>
+        <div class="gauge"><div id="hold"></div></div>
+        <div class="reason" id="reason"></div>
+      </div>
+
+      <div class="card">
+        <div class="label">가장 가까운 인장 3개 (거리 — 작을수록 확실)</div>
+        <table id="ranks"><tr><td>—</td><td></td></tr></table>
+      </div>
+
+      <div class="card">
+        <div class="label">임계값 실시간 조정</div>
+        <div class="slider">
+          <span>ACCEPT</span>
+          <input id="accept" type="range" min="1" max="6" step="0.1" />
+          <b id="acceptV"></b>
+        </div>
+        <div class="slider">
+          <span>MARGIN</span>
+          <input id="margin" type="range" min="0" max="3" step="0.1" />
+          <b id="marginV"></b>
+        </div>
+        <div class="sub" style="margin:0">
+          ACCEPT를 올리면 잘 잡히지만 아무 손동작이나 통과할 위험이 커진다.
+          <b>손을 아무렇게나 흔들어보며</b> 오인식이 안 나는 최대값을 찾을 것.
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="label">발행 기록</div>
+        <div id="log"></div>
+      </div>
+    </div>
+
+    <script type="module" src="/src/devtools/recognizerTest.js"></script>
+  </body>
+</html>

@@ -1,16 +1,23 @@
 // 대전 씬 — 서버 권위: 로컬 판정 없음, 완성 시 SEQ_COMPLETE만 송신하고 판정은 수신 반영.
 // 디자인: docs/design/04-battle.png (숲 배경·HP 패널·인장 도장 타일·카운트다운·양쪽 가나디)
+//
+// ★ 연습 모드(data.practice): 서버·상대 없이 혼자 한 판.
+//   시퀀스 생성·판정·다음 라운드를 전부 로컬에서 처리하고 소켓을 쓰지 않는다.
+//   시연 때 서버가 죽어도 데모가 도는 안전망.
 
 import Phaser from 'phaser';
 import { EVENTS, RULES } from '../../../shared/constants.js';
+import { makeSequence } from '../../../shared/sequence.js';
 import { SEALS } from '../data/seals.js';
 import { getCharacter, spriteKey } from '../data/characters.js';
 import { getSocket } from '../net/socket.js';
 import { startVideoCall } from '../net/webrtc.js';
 import { GAME } from '../config.js';
-import { drawForest, darkPanel, panel, pill, CSS, C, hex, hiDPI } from '../ui/theme.js';
+import { drawForest, darkPanel, pill, CSS, C, hex, hiDPI } from '../ui/theme.js';
 
 const W = GAME.WIDTH, H = GAME.HEIGHT;
+const CPU_ID = '__cpu__';            // 연습 모드의 가상 상대
+const NEXT_ROUND_DELAY_MS = 2000;    // referee.js와 같은 간격
 
 export default class BattleScene extends Phaser.Scene {
   constructor() {
@@ -19,24 +26,31 @@ export default class BattleScene extends Phaser.Scene {
 
   create(data) {
     hiDPI(this);
-    this.socket = getSocket();
-    this.myId = this.socket.id;
+    this.practice = !!data?.practice;
+    this.socket = this.practice ? null : getSocket();
+    this.myId = this.practice ? '__me__' : this.socket.id;
+
     this.sequence = [];
     this.progress = 0;
-    this.locked = true;
-    this.hp = { [this.myId]: RULES.MAX_HP };
+    this.locked = true; // 라운드 시작 전엔 입력 잠금
+    this.round = 0;
+    this.hp = this.practice
+      ? { [this.myId]: RULES.MAX_HP, [CPU_ID]: RULES.MAX_HP }
+      : { [this.myId]: RULES.MAX_HP };
 
     this.meChar = getCharacter(this.registry.get('character'));
-    // 상대 정보가 없어도 기본 캐릭터로 렌더 (getCharacter가 fallback 처리)
-    this.oppChar = getCharacter(this.registry.get('opponentCharacter'));
+    this.oppChar = getCharacter(this.registry.get('opponentCharacter')); // 없으면 기본 캐릭터
 
     drawForest(this);
     this.buildStaticUI();
 
-    this.socket.on(EVENTS.ROUND_START, (p) => this.onRoundStart(p));
-    this.socket.on(EVENTS.ROUND_RESULT, (p) => this.onRoundResult(p));
-    this.socket.on(EVENTS.OPP_PROGRESS, ({ progress, total }) => this.drawOppProgress(progress, total));
-    this.socket.once(EVENTS.MATCH_OVER, (p) => this.onMatchOver(p));
+    // 서버 이벤트 (연습 모드에선 붙이지 않는다)
+    if (!this.practice) {
+      this.socket.on(EVENTS.ROUND_START, (p) => this.onRoundStart(p));
+      this.socket.on(EVENTS.ROUND_RESULT, (p) => this.onRoundResult(p));
+      this.socket.on(EVENTS.OPP_PROGRESS, ({ progress, total }) => this.drawOppProgress(progress, total));
+      this.socket.once(EVENTS.MATCH_OVER, (p) => this.onMatchOver(p));
+    }
 
     // A 인식기 연결 (registry에 있으면). 없으면 스페이스 폴백.
     this.recognizer = this.registry.get('recognizer') ?? null;
@@ -45,25 +59,43 @@ export default class BattleScene extends Phaser.Scene {
       if (!this.locked && this.progress < this.sequence.length) this.onSealMatched(this.sequence[this.progress]);
     });
 
-    // 화상 (joiner가 발신)
+    // 화상 (joiner가 발신). 연습 모드엔 없음.
     const localStream = this.registry.get('localStream');
-    if (localStream && data?.code) {
+    if (!this.practice && localStream && data?.code) {
       this.video = startVideoCall(this.socket, data.code, localStream, { isInitiator: !data.isCreator });
     }
 
-    // 웹캠을 각 캐릭터 위로 배치 (내 캠=좌, 상대 캠=우). 캔버스 스케일에 맞춰 위치 계산.
+    // 웹캠 배치 (내 캠=우, 상대 캠=좌). 연습 모드엔 상대 캠 없음.
     this.setupCams();
 
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
-      this.socket.off(EVENTS.ROUND_START);
-      this.socket.off(EVENTS.ROUND_RESULT);
-      this.socket.off(EVENTS.OPP_PROGRESS);
+      if (this.socket) {
+        this.socket.off(EVENTS.ROUND_START);
+        this.socket.off(EVENTS.ROUND_RESULT);
+        this.socket.off(EVENTS.OPP_PROGRESS);
+      }
       this.video?.stop();
       if (this.recognizer) this.recognizer.onSeal = () => {};
       this.restoreCams();
     });
 
-    if (data?.firstRound) this.onRoundStart(data.firstRound);
+    if (this.practice) this.startPracticeRound();
+    else if (data?.firstRound) this.onRoundStart(data.firstRound); // 로비가 넘긴 첫 라운드
+  }
+
+  // ── 연습 모드: 서버 심판이 하던 일을 로컬에서 (referee.js와 같은 규칙) ──
+  startPracticeRound() {
+    this.round += 1;
+    const length = this.round <= 2 ? 3 : 5;
+    this.onRoundStart({ round: this.round, sequence: makeSequence(length) });
+  }
+
+  resolvePracticeRound() {
+    const damage = RULES.DAMAGE[this.sequence.length] ?? 0;
+    this.hp[CPU_ID] = Math.max(0, this.hp[CPU_ID] - damage);
+    this.onRoundResult({ winner: this.myId, hp: { ...this.hp } });
+    if (this.hp[CPU_ID] <= 0) this.time.delayedCall(NEXT_ROUND_DELAY_MS, () => this.onMatchOver({ winner: this.myId }));
+    else this.time.delayedCall(NEXT_ROUND_DELAY_MS, () => this.startPracticeRound());
   }
 
   buildStaticUI() {
@@ -79,10 +111,9 @@ export default class BattleScene extends Phaser.Scene {
 
     // 상대 HP + 진행 패널 (우상단)
     darkPanel(this, 940, 74, 440, 108);
-    this.add.text(1145, 42, '상대', { fontSize: '20px', fontStyle: 'bold', color: CSS.lose }).setOrigin(1, 0);
-    this.oppNameText = this.add.text(735, 42, '', { fontSize: '18px', color: '#ffb3b3' });
+    this.add.text(1145, 42, this.practice ? '연습 상대' : '상대', { fontSize: '20px', fontStyle: 'bold', color: CSS.lose }).setOrigin(1, 0);
     this.oppHpText = this.add.text(735, 42, '', { fontSize: '18px', fontFamily: 'monospace', color: CSS.lose });
-    this.oppProgLabel = this.add.text(735, 96, '상대 진행 0/0', { fontSize: '14px', color: '#ffcc99' });
+    this.oppProgLabel = this.add.text(735, 96, this.practice ? '연습 모드' : '상대 진행 0/0', { fontSize: '14px', color: '#ffcc99' });
 
     this.hpGfx = this.add.graphics();
     this.oppProgGfx = this.add.graphics();
@@ -91,6 +122,11 @@ export default class BattleScene extends Phaser.Scene {
 
     // 목표 인장 라벨
     this.targetPill = pill(this, W / 2, 168, '목표 인장 0/0', { fill: 0x2a3a2b, textColor: CSS.orange, bold: true });
+
+    // 연습 모드 표시
+    if (this.practice) {
+      this.add.text(W / 2, 100, '연습 모드 · 서버 없이 혼자 진행', { fontSize: '15px', color: CSS.win }).setOrigin(0.5, 0);
+    }
 
     // 인장 타일 컨테이너
     this.sealRow = this.add.container(0, 0);
@@ -113,7 +149,6 @@ export default class BattleScene extends Phaser.Scene {
     // 배너 (술법/피격)
     this.banner = this.add.text(W / 2, 120, '', { fontSize: '44px', fontStyle: 'bold', color: '#fff' }).setOrigin(0.5).setDepth(50);
 
-    // 양쪽 가나디
     this.drawFighters();
   }
 
@@ -129,21 +164,21 @@ export default class BattleScene extends Phaser.Scene {
     pill(this, 110, cy + 150, '상대', { fill: 0x2a3a2b, border: C.water, textColor: '#9fd0ff', bold: true });
   }
 
-  // 웹캠 2개를 각 캐릭터 머리 위(월드 좌표)로 배치. 캔버스 화면 좌표로 변환.
+  // 웹캠을 각 캐릭터 머리 위(월드 좌표)로 배치. 캔버스 화면 좌표로 변환.
   setupCams() {
     this.localCam = document.getElementById('local-cam');
     this.remoteCam = document.getElementById('remote-cam');
-    if (this.remoteCam) this.remoteCam.style.display = 'block'; // 대전 중에만 상대 캠 표시
+    if (!this.practice && this.remoteCam) this.remoteCam.style.display = 'block'; // 대전 중에만
     this._reposition = () => this.positionCams();
     this.positionCams();
-    this.time.delayedCall(60, this._reposition); // 초기 bounds 안정화 후 한 번 더
+    this.time.delayedCall(60, this._reposition);
     this.scale.on('resize', this._reposition);
   }
 
   positionCams() {
     const rect = this.game.canvas.getBoundingClientRect();
     const sx = rect.width / W, sy = rect.height / H;
-    const camW = 150, camH = 112, topY = 205; // 캐릭터(cy=470, 상단 ~320) 머리 위
+    const camW = 150, camH = 112, topY = 205;
     const place = (el, worldCx) => {
       if (!el) return;
       el.style.position = 'fixed';
@@ -153,18 +188,17 @@ export default class BattleScene extends Phaser.Scene {
       el.style.height = `${camH * sy}px`;
       el.style.zIndex = '10';
     };
-    place(this.localCam, W - 120);   // 내 캐릭터 (우)
-    place(this.remoteCam, 120);      // 상대 캐릭터 (좌)
+    place(this.localCam, W - 120);              // 내 캐릭터 (우)
+    if (!this.practice) place(this.remoteCam, 120); // 상대 캐릭터 (좌)
   }
 
-  // 대전 나갈 때 캠을 원래 우상단 레이아웃으로 복구
   restoreCams() {
     if (this._reposition) this.scale.off('resize', this._reposition);
     [this.localCam, this.remoteCam].forEach((el) => {
       if (!el) return;
       ['position', 'left', 'top', 'width', 'height', 'zIndex'].forEach((p) => { el.style[p] = ''; });
     });
-    if (this.remoteCam) this.remoteCam.style.display = 'none'; // 대전 밖에선 상대 캠 숨김
+    if (this.remoteCam) this.remoteCam.style.display = 'none';
   }
 
   onRoundStart({ round, sequence }) {
@@ -193,6 +227,7 @@ export default class BattleScene extends Phaser.Scene {
     tick();
   }
 
+  // ── A ↔ B 계약 연결 지점 ── recognizer.onSeal → onSealMatched
   attachRecognizer(recognizer) {
     this.recognizer = recognizer;
     recognizer.onSeal = (sealId, confidence, timestamp) => this.onSealMatched(sealId, confidence, timestamp);
@@ -204,16 +239,18 @@ export default class BattleScene extends Phaser.Scene {
     this.progress += 1;
     this.renderSeals();
     this.spark(this.sealX(this.progress - 1), 320, C.orange);
-    this.socket.emit(EVENTS.OPP_PROGRESS, { progress: this.progress, total: this.sequence.length });
+    this.socket?.emit(EVENTS.OPP_PROGRESS, { progress: this.progress, total: this.sequence.length });
+
     if (this.progress >= this.sequence.length) {
-      this.locked = true;
-      this.socket.emit(EVENTS.SEQ_COMPLETE, {});
+      this.locked = true; // 완성 후 판정까지 입력 잠금
+      if (this.practice) this.resolvePracticeRound();
+      else this.socket.emit(EVENTS.SEQ_COMPLETE, {}); // 승부는 서버 수신 순서로 판정
     }
   }
 
   renderSeals() {
     this.sealRow.removeAll(true);
-    const n = this.sequence.length, boxW = 150, boxH = 190, gap = 22, y = 320;
+    const n = this.sequence.length, boxW = 150, boxH = 190, y = 320;
     this.targetPill.t.setText(`목표 인장 ${this.progress}/${n}`);
 
     this.sequence.forEach((id, i) => {
@@ -253,6 +290,7 @@ export default class BattleScene extends Phaser.Scene {
   }
 
   drawOppProgress(progress, total) {
+    if (this.practice) return; // 연습 모드엔 상대가 없다
     this.oppProgLabel?.setText(`상대 진행 ${progress}/${total}`);
     if (!this.oppProgGfx) return;
     const x = 850, y = 90, w = 260, h = 16;
@@ -281,15 +319,14 @@ export default class BattleScene extends Phaser.Scene {
     const oppHp = this.hp[oppId] ?? RULES.MAX_HP;
     this.myHpText.setText(`${myHp} / ${RULES.MAX_HP}`);
     this.oppHpText.setText(`${oppHp} / ${RULES.MAX_HP}`);
-    this.oppNameText.setText(''); // 수치는 oppHpText가 표시
 
     const H2 = 22;
     this.hpGfx.clear();
-    // 내 바 (좌, 초록, 좌→우) — 내 패널(25~455) 안쪽
+    // 내 바 (좌 패널 25~455 안쪽, 초록, 좌→우)
     const mx = 45, my = 74, mw = 380;
     this.hpGfx.fillStyle(0x1a1030, 1).fillRoundedRect(mx, my, mw, H2, H2 / 2);
     this.hpGfx.fillStyle(C.win, 1).fillRoundedRect(mx, my, mw * (myHp / RULES.MAX_HP), H2, H2 / 2);
-    // 상대 바 (우, 빨강, 우→좌로 줆) — 상대 패널(720~1160) 안쪽, 오른쪽 정렬
+    // 상대 바 (우 패널 720~1160 안쪽, 빨강, 우→좌로 줆)
     const ow = 380, oRight = 1145, oy = 64;
     this.hpGfx.fillStyle(0x1a1030, 1).fillRoundedRect(oRight - ow, oy, ow, H2, H2 / 2);
     const fw = ow * (oppHp / RULES.MAX_HP);

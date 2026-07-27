@@ -31,8 +31,8 @@ export default class LobbyScene extends Phaser.Scene {
     const codex = button(this, W - 110, 52, 180, 56, '📜 인장 도감', { fontSize: '18px' });
     codex.zone.on('pointerdown', () => this.scene.start('Codex'));
 
-    // 폼 패널 (DOM — 버튼/입력창)
-    const panel = this.add.dom(W / 2, GAME.HEIGHT / 2 + 60).createFromHTML(`
+    // 폼 패널 (DOM — 버튼/입력창 + 연습 모드). 연습은 서버·상대 없이 혼자.
+    const panel = this.add.dom(W / 2, GAME.HEIGHT / 2 + 70).createFromHTML(`
       <div style="${styPanel}">
         <button id="create" style="${styCreate}">방 만들기 <span style="${styKanji}">忍</span></button>
         <div style="${styDivider}"><span style="${styDivText}">또는 코드로 입장</span></div>
@@ -40,16 +40,19 @@ export default class LobbyScene extends Phaser.Scene {
           <input id="code" placeholder="코드" maxlength="4" style="${styInput}" />
           <button id="join" style="${styJoin}">입장</button>
         </div>
-        <div style="display:flex;justify-content:space-between;margin-top:4px;">
+        <div style="display:flex;justify-content:space-between;margin-top:2px;">
           <span style="${styHint}">A-Z, 0-9 · 4자리</span>
           <span id="err" style="${styErr}"></span>
         </div>
+        <button id="practice" style="${styPractice}">🥋 혼자 연습하기</button>
       </div>
     `);
     const root = panel.node;
     this.err = root.querySelector('#err');
     root.querySelector('#create').onclick = () => this.createRoom();
     root.querySelector('#join').onclick = () => this.joinRoom(root.querySelector('#code').value);
+    // 연습 모드는 소켓을 아예 쓰지 않는다 — 서버 없어도 바로 시작
+    root.querySelector('#practice').onclick = () => this.scene.start('Battle', { practice: true });
 
     // 상태바 (DOM — 방 코드 드래그 선택 + 복사 버튼)
     this.statusDom = this.add.dom(W / 2, GAME.HEIGHT - 56).createFromHTML(`<div id="s" style="${styStatus}"></div>`);
@@ -73,9 +76,12 @@ export default class LobbyScene extends Phaser.Scene {
       this.scene.start('Battle', { firstRound, code: this.roomCode, isCreator: this.isCreator });
     });
 
+    // 씬 종료 시 소켓 리스너 정리 (중복 등록 방지).
+    // ROUND_START도 뗀다 — 연습 모드로 빠졌다 돌아오면 once가 쌓여 뒤늦은 라운드에 튈 수 있음.
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.socket.off(EVENTS.ROOM_STATE);
       this.socket.off(EVENTS.MATCH_INFO);
+      this.socket.off(EVENTS.ROUND_START);
     });
   }
 
@@ -146,3 +152,5 @@ const styStatus = `display:flex;align-items:center;gap:12px;padding:10px 22px;bo
 const styCode = `user-select:all;color:#FF7A2F;font-family:monospace;font-size:22px;letter-spacing:3px;`;
 const styCopy = `padding:5px 12px;border:2px solid #5A4632;border-radius:8px;cursor:pointer;
   background:#FAF1D8;color:#2A1D12;font-size:13px;font-weight:700;`;
+const styPractice = `width:100%;margin-top:4px;padding:12px;border:3px solid #234a29;border-radius:10px;
+  cursor:pointer;background:#3E6B3A;color:#FAF1D8;font-size:16px;font-weight:800;`;
