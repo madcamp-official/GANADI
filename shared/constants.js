@@ -19,6 +19,11 @@ export const SEAL_IDS = [
 // Day 2~3 게임용 임시 인식기가 다루는 쉬운 6종 (룰 기반)
 export const EASY_SEAL_IDS = ['dog', 'monkey', 'tiger', 'horse', 'rat', 'rabbit'];
 
+// 실전 시퀀스에 투입하는 인장 (§4.5 — 도감엔 12종 전부, 실전엔 검증된 것만).
+// 서버 대전과 연습 모드가 같은 목록을 봐야 하므로 여기가 단일 출처.
+// 2026-07-27 기준 실손 검증된 3종. 호랑이·양은 손 겹침으로 아직 제외.
+export const PLAYABLE_SEAL_IDS = ['horse', 'dog', 'rooster'];
+
 // Socket.IO 이벤트명
 export const EVENTS = {
   // 로비/방

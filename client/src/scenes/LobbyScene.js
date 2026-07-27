@@ -31,6 +31,10 @@ export default class LobbyScene extends Phaser.Scene {
         <button id="join" style="${btn('#3a2f55')}">입장</button>
         <div id="status" style="color:#c9b8ee;font-size:16px;height:24px;
                     text-align:center;margin-top:4px;"></div>
+        <button id="practice" style="${btn('#2f4a3a')}">🥋 혼자 연습하기</button>
+        <div style="color:#5a4f75;font-size:13px;text-align:center;">
+          서버·상대 없이 손으로 시퀀스를 맺어본다
+        </div>
       </div>
     `);
 
@@ -38,6 +42,8 @@ export default class LobbyScene extends Phaser.Scene {
     this.status = root.querySelector('#status');
     root.querySelector('#create').onclick = () => this.createRoom();
     root.querySelector('#join').onclick = () => this.joinRoom(root.querySelector('#code').value);
+    // 연습 모드는 소켓을 아예 쓰지 않는다 — 서버가 없어도 눌리면 바로 시작된다
+    root.querySelector('#practice').onclick = () => this.scene.start('Battle', { practice: true });
 
     // 상대 입장/대기 상태 표시
     this.socket.on(EVENTS.ROOM_STATE, ({ code, count }) => {
@@ -59,8 +65,11 @@ export default class LobbyScene extends Phaser.Scene {
     });
 
     // 씬 종료 시 소켓 리스너 정리 (중복 등록 방지)
+    // ROUND_START도 함께 뗀다 — 연습 모드로 빠졌다 로비로 돌아오면 once 핸들러가
+    // 쌓여서, 나중에 뒤늦게 도착한 라운드에 대전 씬으로 튈 수 있다.
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.socket.off(EVENTS.ROOM_STATE);
+      this.socket.off(EVENTS.ROUND_START);
     });
   }
 

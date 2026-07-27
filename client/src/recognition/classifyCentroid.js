@@ -7,12 +7,21 @@
 //   ① ACCEPT_THRESHOLD — 1등까지도 너무 멀면 인장이 아니다 (아무 손동작이나 통과 방지)
 //   ② MARGIN           — 1등과 2등이 붙어 있으면 애매한 것이다 (런너업 마진, §4.2)
 //
-// 한계(§4.1): 한 인장 안에서 손 검출 개수가 갈리면(1손/2손 혼재) 평균이 어느 무리에도
-// 속하지 않는 점이 되어 무너진다. 실제로 tiger가 그렇다 — MLP로 가면 해결된다 (Day 4).
+// ★ 클러스터는 (인장 × 손 개수)로 나뉘어 있다 — 키가 "tiger__2h" 같은 형태다.
+//   한 인장 안에서 1손/2손이 섞이면 그 평균은 어느 무리에도 속하지 않는 허공의 점이 되어
+//   인식이 무너진다(호랑이가 실제로 그랬다). 손 개수별로 대표를 따로 두면 그 문제가 사라지고,
+//   실전에서 MediaPipe가 프레임마다 1손/2손을 오갈 때도 양쪽 다 커버된다.
+//   → 같은 인장의 다른 클러스터는 "경쟁자"가 아니므로 런너업 마진 계산에서 제외한다.
+//
 // recognizer.js가 Day 5에 MLP로 교체돼도 폴백 플래그로 이 파일은 살려둔다 (§4.6).
 
-import { CENTROIDS } from './centroids.js';
+import { CENTROIDS, CENTROID_META } from './centroids.js';
 import { RECOGNITION } from '../config.js';
+
+/** 클러스터 키 → 인장 id. 메타가 없는 옛 형식(키=인장)도 그대로 동작한다 */
+function sealIdOf(key) {
+  return CENTROID_META?.[key]?.sealId ?? key.split('__')[0];
+}
 
 function euclid(a, b) {
   let sum = 0;
@@ -38,14 +47,18 @@ export function classifyCentroid(feat) {
 
   const { ACCEPT_THRESHOLD, MARGIN } = RECOGNITION;
 
-  let best = null;
-  let second = null;
-  for (const id in CENTROIDS) {
-    const d = euclid(feat, CENTROIDS[id]);
-    if (!best || d < best.d) { second = best; best = { id, d }; }
-    else if (!second || d < second.d) { second = { id, d }; }
+  // 클러스터가 20~30개뿐이라 전부 재고 정렬한다 (프레임당 비용 무시 가능, 대신 명백히 옳다).
+  const scored = [];
+  for (const key in CENTROIDS) {
+    scored.push({ id: sealIdOf(key), key, d: euclid(feat, CENTROIDS[key]) });
   }
-  if (!best) return none('no-input');
+  if (!scored.length) return none('no-input');
+  scored.sort((a, b) => a.d - b.d);
+
+  // 1등은 전체 최근접, 2등은 "다른 인장" 중 최근접.
+  // 같은 인장의 1손/2손 클러스터끼리 서로를 애매하게 만들면 안 되기 때문.
+  const best = scored[0];
+  const second = scored.find((c) => c.id !== best.id) ?? null;
 
   if (best.d > ACCEPT_THRESHOLD) return none('too-far', best, second);          // ① 너무 멂
   if (second && (second.d - best.d) < MARGIN) return none('ambiguous', best, second); // ② 애매함

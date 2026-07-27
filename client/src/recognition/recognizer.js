@@ -50,6 +50,7 @@ export async function createRecognizer() {
   const votes = [];
   let holdSeal = null;
   let holdStart = 0;
+  let holdConf = 0; // 이번 홀드 동안 관측한 최고 confidence
   let fired = null; // 엣지 트리거: 같은 홀드에서 두 번 발행되는 것 방지
 
   const rec = {
@@ -69,8 +70,15 @@ export async function createRecognizer() {
       if (winner !== holdSeal) {
         holdSeal = winner;
         holdStart = nowMs;
+        holdConf = 0;
         fired = null;
       }
+
+      // ★ 홀드 중 최고 confidence를 들고 간다.
+      //   확정 순간의 프레임이 하필 거부된 프레임(confidence 0)일 수 있는데,
+      //   그때 0을 발행하면 "인장은 맞았는데 신뢰도 0"이라는 거짓 신호가 나간다.
+      //   다수결·홀드는 여러 프레임에 걸친 판단이므로 confidence도 그 구간에서 뽑아야 한다.
+      if (sealId && sealId === holdSeal) holdConf = Math.max(holdConf, confidence);
 
       const held = holdSeal ? nowMs - holdStart : 0;
       const holdProgress = holdSeal ? Math.min(1, held / RULES.SEAL_HOLD_MS) : 0;
@@ -80,11 +88,12 @@ export async function createRecognizer() {
         confirmed = holdSeal;
         if (fired !== confirmed) {
           fired = confirmed;
-          rec.onSeal?.(confirmed, confidence, Date.now()); // 계약대로 발행
+          rec.onSeal?.(confirmed, holdConf, Date.now()); // 계약대로 발행
         }
       }
 
-      return { candidate: winner, confirmed, confidence, holdProgress };
+      // confidence: 홀드 중이면 그 홀드의 최고값, 아니면 현재 프레임 값
+      return { candidate: winner, confirmed, confidence: holdSeal ? holdConf : confidence, holdProgress };
     },
   };
 

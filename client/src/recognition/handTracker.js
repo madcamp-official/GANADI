@@ -110,6 +110,10 @@ export async function getHandTracker(video = document.getElementById('local-cam'
       now: () => performance.now(),
     });
     instance.start();
+
+    // 개발 중 진단용 — 콘솔에서 __handTracker로 상태를 들여다볼 수 있다 (프로덕션 빌드엔 없음)
+    if (import.meta.env?.DEV) window.__handTracker = instance;
+
     pending = null;
     return instance;
   })();

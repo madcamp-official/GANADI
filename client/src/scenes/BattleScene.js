@@ -1,14 +1,23 @@
 // 대전 씬 — 목표 인장 시퀀스, 양측 체력바, 내 진행 게이지.
 // 서버 권위: 로컬 판정 없음. 시퀀스 완성 시 서버에 SEQ_COMPLETE만 송신, 판정은 수신해 반영.
 // (인식기 연결 전까지) 스페이스바로 인장 맺기를 시뮬레이션 → onSeal 대체.
+//
+// ★ 연습 모드(data.practice): 서버·상대 없이 혼자 한 판.
+//   심판은 2인이 모여야 라운드를 시작하므로 온라인 구조로는 혼자 돌 수 없다.
+//   연습 모드에선 시퀀스 생성·판정·다음 라운드를 전부 로컬에서 처리하고 소켓을 아예 쓰지 않는다.
+//   시연 때 서버가 죽어도 데모가 도는 안전망이기도 하다.
 
 import Phaser from 'phaser';
 import { EVENTS, RULES } from '../../../shared/constants.js';
+import { makeSequence } from '../../../shared/sequence.js';
 import { SEALS } from '../data/seals.js';
 import { getCharacter } from '../data/characters.js';
 import { getSocket } from '../net/socket.js';
 import { startVideoCall } from '../net/webrtc.js';
 import { GAME } from '../config.js';
+
+const CPU_ID = '__cpu__';            // 연습 모드의 가상 상대
+const NEXT_ROUND_DELAY_MS = 2000;    // referee.js와 같은 간격
 
 export default class BattleScene extends Phaser.Scene {
   constructor() {
@@ -16,21 +25,27 @@ export default class BattleScene extends Phaser.Scene {
   }
 
   create(data) {
-    this.socket = getSocket();
-    this.myId = this.socket.id;
+    this.practice = !!data?.practice;
+    this.socket = this.practice ? null : getSocket();
+    this.myId = this.practice ? '__me__' : this.socket.id;
 
     this.sequence = [];
     this.progress = 0;
     this.locked = true; // 라운드 시작 전엔 입력 잠금
-    this.hp = { [this.myId]: RULES.MAX_HP };
+    this.round = 0;
+    this.hp = this.practice
+      ? { [this.myId]: RULES.MAX_HP, [CPU_ID]: RULES.MAX_HP }
+      : { [this.myId]: RULES.MAX_HP };
 
     this.buildStaticUI();
 
-    // 서버 이벤트
-    this.socket.on(EVENTS.ROUND_START, (p) => this.onRoundStart(p));
-    this.socket.on(EVENTS.ROUND_RESULT, (p) => this.onRoundResult(p));
-    this.socket.on(EVENTS.OPP_PROGRESS, ({ progress, total }) => this.drawOppProgress(progress, total));
-    this.socket.once(EVENTS.MATCH_OVER, (p) => this.onMatchOver(p));
+    // 서버 이벤트 (연습 모드에선 붙이지 않는다)
+    if (!this.practice) {
+      this.socket.on(EVENTS.ROUND_START, (p) => this.onRoundStart(p));
+      this.socket.on(EVENTS.ROUND_RESULT, (p) => this.onRoundResult(p));
+      this.socket.on(EVENTS.OPP_PROGRESS, ({ progress, total }) => this.drawOppProgress(progress, total));
+      this.socket.once(EVENTS.MATCH_OVER, (p) => this.onMatchOver(p));
+    }
 
     // A의 인식기 붙이기 — A가 부팅 시 registry에 넣어둔 recognizer를 집어 연결.
     // (A가 카메라+step() 루프 소유. 여기선 onSeal → onSealMatched 대입만.)
@@ -47,23 +62,48 @@ export default class BattleScene extends Phaser.Scene {
 
     // 화상(WebRTC) 시작 — 입장한 쪽(joiner)이 발신, 방장이 응답. 실패해도 게임 무관.
     const localStream = this.registry.get('localStream');
-    if (localStream && data?.code) {
+    if (!this.practice && localStream && data?.code) {
       this.video = startVideoCall(this.socket, data.code, localStream, {
         isInitiator: !data.isCreator,
       });
     }
 
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
-      this.socket.off(EVENTS.ROUND_START);
-      this.socket.off(EVENTS.ROUND_RESULT);
-      this.socket.off(EVENTS.OPP_PROGRESS);
+      if (this.socket) {
+        this.socket.off(EVENTS.ROUND_START);
+        this.socket.off(EVENTS.ROUND_RESULT);
+        this.socket.off(EVENTS.OPP_PROGRESS);
+      }
       this.video?.stop();
       // 죽은 씬으로 인식 이벤트가 흘러들지 않게 콜백 해제 (A의 step 루프는 계속 돎)
       if (this.recognizer) this.recognizer.onSeal = () => {};
     });
 
+    if (this.practice) this.startPracticeRound();
     // 로비에서 넘겨준 첫 라운드 즉시 반영
-    if (data?.firstRound) this.onRoundStart(data.firstRound);
+    else if (data?.firstRound) this.onRoundStart(data.firstRound);
+  }
+
+  // ── 연습 모드: 서버 심판이 하던 일을 로컬에서 ──
+  // referee.js와 같은 규칙 — 초반 3연쇄, 3라운드부터 5연쇄.
+  startPracticeRound() {
+    this.round += 1;
+    const length = this.round <= 2 ? 3 : 5;
+    this.onRoundStart({ round: this.round, sequence: makeSequence(length) });
+  }
+
+  // 연습 모드 판정: 완성하면 무조건 내가 이긴 것으로 처리하고 가상 상대 체력을 깎는다.
+  // (상대가 없으므로 경쟁이 아니라 "완주 연습"이 목적)
+  resolvePracticeRound() {
+    const damage = RULES.DAMAGE[this.sequence.length] ?? 0;
+    this.hp[CPU_ID] = Math.max(0, this.hp[CPU_ID] - damage);
+    this.onRoundResult({ winner: this.myId, hp: { ...this.hp } });
+
+    if (this.hp[CPU_ID] <= 0) {
+      this.time.delayedCall(NEXT_ROUND_DELAY_MS, () => this.onMatchOver({ winner: this.myId }));
+    } else {
+      this.time.delayedCall(NEXT_ROUND_DELAY_MS, () => this.startPracticeRound());
+    }
   }
 
   buildStaticUI() {
@@ -74,10 +114,17 @@ export default class BattleScene extends Phaser.Scene {
     this.hpGfx = this.add.graphics();
     this.drawHp();
 
-    // 상대 진행 표시 (OPP_PROGRESS 수신 → 갱신)
-    this.oppProgText = this.add.text(GAME.WIDTH - 40, 100, '상대 진행: 0/0', {
-      fontSize: '18px', color: '#ffb3b3',
-    }).setOrigin(1, 0);
+    // 상대 진행 표시 (OPP_PROGRESS 수신 → 갱신). 연습 모드엔 상대가 없다
+    this.oppProgText = this.add.text(GAME.WIDTH - 40, 100,
+      this.practice ? '연습 상대' : '상대 진행: 0/0', {
+        fontSize: '18px', color: '#ffb3b3',
+      }).setOrigin(1, 0);
+
+    if (this.practice) {
+      this.add.text(GAME.WIDTH / 2, 12, '연습 모드 · 서버 없이 혼자 진행', {
+        fontSize: '15px', color: '#8fffa0',
+      }).setOrigin(0.5, 0);
+    }
 
     this.roundText = this.add.text(GAME.WIDTH / 2, 40, '', {
       fontSize: '20px', color: '#c9b8ee',
@@ -140,6 +187,7 @@ export default class BattleScene extends Phaser.Scene {
   }
 
   drawOppProgress(progress, total) {
+    if (this.practice) return; // 연습 모드엔 상대가 없다
     this.oppProgText.setText(`상대 진행: ${progress}/${total}`);
   }
 
@@ -162,11 +210,12 @@ export default class BattleScene extends Phaser.Scene {
     this.progress += 1;
     this.renderSeals();
     // 상대 화면에 내 진행 상황 실시간 표시
-    this.socket.emit(EVENTS.OPP_PROGRESS, { progress: this.progress, total: this.sequence.length });
+    this.socket?.emit(EVENTS.OPP_PROGRESS, { progress: this.progress, total: this.sequence.length });
 
     if (this.progress >= this.sequence.length) {
-      this.locked = true; // 완성 후 서버 판정까지 입력 잠금
-      this.socket.emit(EVENTS.SEQ_COMPLETE, {}); // 승부는 서버 수신 순서로 판정
+      this.locked = true; // 완성 후 판정까지 입력 잠금
+      if (this.practice) this.resolvePracticeRound();
+      else this.socket.emit(EVENTS.SEQ_COMPLETE, {}); // 승부는 서버 수신 순서로 판정
     }
   }
 
