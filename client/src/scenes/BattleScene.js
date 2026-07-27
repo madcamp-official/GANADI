@@ -14,6 +14,7 @@ import { getSocket } from '../net/socket.js';
 import { startVideoCall } from '../net/webrtc.js';
 import { GAME } from '../config.js';
 import { drawForest, darkPanel, pill, CSS, C, hex, hiDPI } from '../ui/theme.js';
+import { holdGaugeView } from '../ui/holdGauge.js';
 
 const W = GAME.WIDTH, H = GAME.HEIGHT;
 const CPU_ID = '__cpu__';            // 연습 모드의 가상 상대
@@ -55,6 +56,7 @@ export default class BattleScene extends Phaser.Scene {
     // A 인식기 연결 (registry에 있으면). 없으면 스페이스 폴백.
     this.recognizer = this.registry.get('recognizer') ?? null;
     if (this.recognizer) this.attachRecognizer(this.recognizer);
+    this.subscribeRecognition(); // 인식 게이지용 프레임 구독
     this.input.keyboard.on('keydown-SPACE', () => {
       if (!this.locked && this.progress < this.sequence.length) this.onSealMatched(this.sequence[this.progress]);
     });
@@ -76,6 +78,8 @@ export default class BattleScene extends Phaser.Scene {
       }
       this.video?.stop();
       if (this.recognizer) this.recognizer.onSeal = () => {};
+      this.unsubFrame?.(); // 죽은 씬에 프레임이 흘러들지 않게 (추적기 루프는 계속 돎)
+      this.unsubFrame = null;
       this.restoreCams();
     });
 
@@ -148,6 +152,13 @@ export default class BattleScene extends Phaser.Scene {
 
     // 배너 (술법/피격)
     this.banner = this.add.text(W / 2, 120, '', { fontSize: '44px', fontStyle: 'bold', color: '#fff' }).setOrigin(0.5).setDepth(50);
+
+    // 인식 게이지 — 지금 무엇을 인식 중이고 홀드가 얼마나 찼는지 (§3.2)
+    // 이게 없으면 "인식이 안 되는 것"과 "인식되는 중"을 구분할 수 없다.
+    this.holdGfx = this.add.graphics().setDepth(20);
+    this.holdText = this.add.text(0, 0, '', {
+      fontSize: '15px', fontStyle: 'bold', color: CSS.scroll,
+    }).setOrigin(0.5).setDepth(21);
 
     this.drawFighters();
   }
@@ -231,6 +242,40 @@ export default class BattleScene extends Phaser.Scene {
   attachRecognizer(recognizer) {
     this.recognizer = recognizer;
     recognizer.onSeal = (sealId, confidence, timestamp) => this.onSealMatched(sealId, confidence, timestamp);
+  }
+
+  // 인식 게이지용 구독 — onSeal은 "확정"만 알려주므로, 확정 전 상태를 보려면 프레임을 받아야 한다.
+  // 추적기 루프는 씬과 무관하게 계속 도니, 여기선 구독만 하고 종료 시 해지한다.
+  subscribeRecognition() {
+    const tracker = this.registry.get('handTracker');
+    if (!tracker) return; // 인식기 없이 스페이스 폴백으로 도는 경우
+    this.unsubFrame = tracker.onFrame(({ state }) => this.drawHoldGauge(state));
+  }
+
+  /** 현재 목표 타일 아래에 인식 게이지를 그린다. 무엇을 보여줄지는 holdGaugeView가 정한다 */
+  drawHoldGauge(state) {
+    const g = this.holdGfx;
+    if (!g) return;
+    g.clear();
+    this.holdText.setText('');
+
+    const view = holdGaugeView(state, this.sequence[this.progress], this.locked);
+    if (!view) return;
+
+    const seal = SEALS[view.sealId] ?? { name: view.sealId };
+    const x = this.sealX(this.progress), y = 320 + 190 / 2 + 26;
+    const w = 150, h = 14;
+
+    g.fillStyle(C.woodShadow, 0.85).fillRoundedRect(x - w / 2, y, w, h, h / 2);
+    if (view.fill > 0) {
+      // 최소 길이를 h로 둬서 아주 낮은 진행률도 눈에 보이게
+      g.fillStyle(view.match ? C.orange : C.woodDark, 1)
+        .fillRoundedRect(x - w / 2, y, Math.max(h, w * view.fill), h, h / 2);
+    }
+
+    this.holdText.setPosition(x, y + h + 13)
+      .setText(view.match ? `${seal.name} 유지…` : `${seal.name} (목표 아님)`)
+      .setColor(view.match ? CSS.orange : CSS.muted);
   }
 
   onSealMatched(sealId) {
