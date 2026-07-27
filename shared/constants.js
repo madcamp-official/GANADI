@@ -26,6 +26,7 @@ export const EVENTS = {
   JOIN_ROOM: 'room:join',
   ROOM_STATE: 'room:state',
   PLAYER_LEFT: 'room:playerLeft',
+  MATCH_INFO: 'match:info',         // 서버 → 각 클라: 상대 캐릭터 등 매치 정보
 
   // 라운드 진행 (서버 권위)
   ROUND_START: 'round:start',       // 서버 → 클라: 시퀀스 배포

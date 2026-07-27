@@ -19,16 +19,16 @@ function findRoomBySocket(socketId) {
 }
 
 export function registerRoomHandlers(io, socket) {
-  socket.on(EVENTS.CREATE_ROOM, (_payload, ack) => {
+  socket.on(EVENTS.CREATE_ROOM, ({ character } = {}, ack) => {
     const code = makeRoomCode();
-    rooms.set(code, { players: [socket.id], referee: null });
+    rooms.set(code, { players: [socket.id], referee: null, characters: { [socket.id]: character } });
     socket.join(code);
     console.log(`[room] ${code} 생성 by ${socket.id}`);
     ack?.({ code });
     io.to(code).emit(EVENTS.ROOM_STATE, { code, count: 1 });
   });
 
-  socket.on(EVENTS.JOIN_ROOM, ({ code }, ack) => {
+  socket.on(EVENTS.JOIN_ROOM, ({ code, character } = {}, ack) => {
     const room = rooms.get(code);
     if (!room) {
       console.log(`[room] ${code} 입장 실패: NO_ROOM (${socket.id})`);
@@ -40,15 +40,23 @@ export function registerRoomHandlers(io, socket) {
     }
 
     room.players.push(socket.id);
+    room.characters[socket.id] = character;
     socket.join(code);
     console.log(`[room] ${code} 입장 by ${socket.id} → ${room.players.length}명`);
     ack?.({ code });
     io.to(code).emit(EVENTS.ROOM_STATE, { code, count: 2 });
 
-    // 2인이 모이면 심판을 붙이고 첫 라운드 시작
+    // 2인이 모이면 상대 캐릭터를 각자에게 알리고 심판을 붙여 첫 라운드 시작
     if (room.players.length === 2) {
       console.log(`[room] ${code} 2인 매칭 완료 → 심판 시작`);
-      room.referee = createReferee(io, code, room.players);
+      const [p1, p2] = room.players;
+      io.to(p1).emit(EVENTS.MATCH_INFO, { opponent: room.characters[p2] });
+      io.to(p2).emit(EVENTS.MATCH_INFO, { opponent: room.characters[p1] });
+
+      room.referee = createReferee(io, code, room.players, () => {
+        rooms.delete(code); // 매치 종료 시 방 정리 (메모리 누수 방지·재대전은 새 방으로)
+        console.log(`[room] ${code} 매치 종료 → 방 정리`);
+      });
       room.referee.start();
     }
   });
