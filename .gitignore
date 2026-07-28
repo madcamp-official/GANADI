@@ -9,6 +9,7 @@ build/
 Day1_A.md
 Day2_A.md
 Day2.md
+Day3_A.md
 # 수집된 학습 데이터 / 모델 (용량 큼 — 별도 관리)
 # ★ 반드시 선행 슬래시 — 없으면 client/src/data/ 등 하위 data 폴더까지 통째로 무시된다
 /data/
