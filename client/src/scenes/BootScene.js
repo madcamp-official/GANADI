@@ -1,6 +1,8 @@
 // 에셋 로드 + 웹캠 권한 요청. 완료되면 로비로.
 
 import Phaser from 'phaser';
+import { CHARACTERS, spriteKey } from '../data/characters.js';
+import { hiDPI } from '../ui/theme.js';
 
 export default class BootScene extends Phaser.Scene {
   constructor() {
@@ -8,10 +10,14 @@ export default class BootScene extends Phaser.Scene {
   }
 
   preload() {
-    // TODO: 인장 아이콘, 캐릭터 스프라이트, 이펙트, 사운드 로드.
+    // 가나디 캐릭터 스프라이트 (client/public/characters/ganadi-<id>.png)
+    CHARACTERS.forEach((c) => this.load.image(spriteKey(c.id), `/characters/ganadi-${c.id}.png`));
   }
 
   async create() {
+    hiDPI(this);
+    this.makeParticleTextures();
+
     const hint = this.add.text(40, 40, '웹캠 권한을 허용해주세요…', { fontSize: '24px' });
 
     await this.requestCamera();
@@ -19,6 +25,22 @@ export default class BootScene extends Phaser.Scene {
     hint.destroy();
     // 흐름: Boot → CharacterSelect → Calibration → Lobby → Battle → Result
     this.scene.start('CharacterSelect');
+  }
+
+  // 에셋 파일 없이 코드로 파티클용 텍스처 생성 (게임 전역 TextureManager에 등록).
+  makeParticleTextures() {
+    if (this.textures.exists('spark')) return;
+    // 흰색 원 (tint로 색 입힘)
+    const g = this.make.graphics({ x: 0, y: 0, add: false });
+    g.fillStyle(0xffffff, 1);
+    g.fillCircle(8, 8, 8);
+    g.generateTexture('spark', 16, 16);
+    // 얇은 링 (술법 발동 확산)
+    g.clear();
+    g.lineStyle(6, 0xffffff, 1);
+    g.strokeCircle(32, 32, 28);
+    g.generateTexture('ring', 64, 64);
+    g.destroy();
   }
 
   // 웹캠 스트림 확보 → 로컬 프리뷰(#local-cam)에 표시 + registry에 저장.

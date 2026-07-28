@@ -7,12 +7,17 @@ import { makeSequence } from './sequence.js';
 
 const NEXT_ROUND_DELAY_MS = 2000; // 결과 연출 여유 후 다음 라운드
 
-export function createReferee(io, code, players) {
+export function createReferee(io, code, players, onEnd) {
   const hp = Object.fromEntries(players.map((id) => [id, RULES.MAX_HP]));
   let round = 0;
   let currentSequence = null;
   let roundResolved = true; // 라운드 진행 중이 아니면 완성 이벤트 무시
   let over = false;
+
+  function end() {
+    over = true;
+    onEnd?.(); // 방 정리는 rooms.js가 담당
+  }
 
   function startRound() {
     if (over) return;
@@ -39,9 +44,9 @@ export function createReferee(io, code, players) {
     io.to(code).emit(EVENTS.ROUND_RESULT, { winner, loser, damage, hp: { ...hp } });
 
     if (hp[loser] <= 0) {
-      over = true;
       console.log(`[referee] ${code} 종료 → 승자 ${winner}`);
       io.to(code).emit(EVENTS.MATCH_OVER, { winner });
+      end();
     } else {
       setTimeout(startRound, NEXT_ROUND_DELAY_MS);
     }
@@ -50,10 +55,10 @@ export function createReferee(io, code, players) {
   // 이탈 시 남은 쪽 몰수승 (재접속 복구는 스코프 아웃).
   function forfeit(leaverId) {
     if (over) return;
-    over = true;
     const winner = players.find((id) => id !== leaverId);
     console.log(`[referee] ${code} 몰수승 → ${winner} (${leaverId} 이탈)`);
     if (winner) io.to(code).emit(EVENTS.MATCH_OVER, { winner, reason: 'forfeit' });
+    end();
   }
 
   return {

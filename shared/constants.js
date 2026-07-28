@@ -21,13 +21,19 @@ export const EASY_SEAL_IDS = ['dog', 'monkey', 'tiger', 'horse', 'rat', 'rabbit'
 
 // 실전 시퀀스에 투입하는 인장 (§4.5 — 도감엔 12종 전부, 실전엔 검증된 것만).
 // 서버 대전과 연습 모드가 같은 목록을 봐야 하므로 여기가 단일 출처.
-// 2026-07-28 MLP 교체 후 11종으로 확대. 근거: 학습에 없던 제3자 세션(seals_2026-07-28_390f)을
-// 시험지로 놓고 4회 채점 — 아래 11종은 4회 전부 100%였다.
-// 'goat'만 제외한다. 같은 조건에서 0/100/3/100%로 흔들리고, 틀릴 때 tiger·rat으로 간다
-// (재수집으로 자세를 맞춘 뒤에도 남은 유일한 인장 — 자세가 아니라 손 모양 자체가 다를 가능성).
+// 2026-07-28 MLP(특징 v2) 교체 후 3종 → 11종. 근거는 "제3자 손"이다:
+// 학습에 없는 세션(seals_2026-07-28_390f, 제3자)을 시험지로 놓고 4회 채점했고, 아래 11종은
+// 4회 전부 100%였다. main의 "12종 검증 완료"는 센트로이드 + 팀원 손(=학습 데이터) 기준이라
+// 같은 조건이 아니다 — 자기 손으로 잘 되는 건 시험 문제를 미리 보고 친 시험이다.
+//
+// 'goat'만 뺀다. 같은 조건에서 0/100/3/100%로 흔들리고, 틀릴 때 tiger·rat으로 가면서
+// 확신도가 1.00이라 임계값으로 못 거른다 — 게이지가 엉뚱한 인장으로 자신 있게 차오른다.
+// ★ goat 자세를 맞춰 재수집한 뒤 trainMLP --holdout 으로 다시 채점해서 통과하면 주석만 풀면 된다.
+//   monkey·snake·rooster가 정확히 그 경로로 0% → 100%가 됐다.
 export const PLAYABLE_SEAL_IDS = [
   'rat', 'ox', 'tiger', 'rabbit', 'dragon', 'snake',
   'horse', 'monkey', 'rooster', 'dog', 'pig',
+  // 'goat',  ← 재수집 후 채점 통과하면 주석 해제 (도감엔 12종 그대로 나온다)
 ];
 
 // Socket.IO 이벤트명
@@ -37,6 +43,7 @@ export const EVENTS = {
   JOIN_ROOM: 'room:join',
   ROOM_STATE: 'room:state',
   PLAYER_LEFT: 'room:playerLeft',
+  MATCH_INFO: 'match:info',         // 서버 → 각 클라: 상대 캐릭터 등 매치 정보
 
   // 라운드 진행 (서버 권위)
   ROUND_START: 'round:start',       // 서버 → 클라: 시퀀스 배포

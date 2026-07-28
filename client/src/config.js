@@ -9,6 +9,9 @@ export const GAME = {
   HEIGHT: 720,
 };
 
+// 내부 렌더 배수 — 좌표계(1280×720)는 그대로, 실제 렌더 해상도만 배로 올려 선명하게.
+export const RENDER_SCALE = 2;
+
 export const RECOGNITION = {
   NUM_HANDS: 2,
 
