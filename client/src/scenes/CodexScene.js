@@ -3,11 +3,13 @@
 
 import Phaser from 'phaser';
 import { ALL_SEALS } from '../data/seals.js';
+import { PLAYABLE_SEAL_IDS, SEAL_IDS } from '../../../shared/constants.js';
 import { GAME } from '../config.js';
-import { drawForest, panel, button, DIFF, CSS, C, hex, hiDPI } from '../ui/theme.js';
+import { drawForest, panel, button, DIFF, CSS, C, hex, hiDPI, KANJI_FONT } from '../ui/theme.js';
 
-// 현재 실전 투입 인장 (서버 sequence.js의 PLAYABLE_SEALS와 맞춤 — Day5에 확정)
-const PLAYABLE = ['horse', 'dog', 'rooster'];
+// 실전 투입 인장 (shared 단일 출처). 전종이면 배지 생략(모두 실전이라 표시 의미 없음).
+const PLAYABLE = PLAYABLE_SEAL_IDS;
+const SHOW_BADGE = PLAYABLE_SEAL_IDS.length < SEAL_IDS.length;
 
 export default class CodexScene extends Phaser.Scene {
   constructor() {
@@ -23,7 +25,7 @@ export default class CodexScene extends Phaser.Scene {
     panel(this, W / 2, 62, 320, 66);
     this.add.text(W / 2 - 26, 62, '인장 도감', { fontSize: '30px', fontStyle: 'bold', color: CSS.outline }).setOrigin(0.5);
     this.add.text(W / 2 + 40, 62, '｜', { fontSize: '28px', color: '#b9a888' }).setOrigin(0.5);
-    this.add.text(W / 2 + 96, 62, '十二支', { fontSize: '28px', fontStyle: 'bold', color: CSS.orange }).setOrigin(0.5);
+    this.add.text(W / 2 + 96, 62, '十二支', { fontFamily: KANJI_FONT, fontSize: '28px', fontStyle: 'bold', color: CSS.orange }).setOrigin(0.5);
 
     // 난이도 범례
     const legend = [['쉬움', C.wind], ['보통', C.elec], ['어려움', C.lose]];
@@ -48,7 +50,7 @@ export default class CodexScene extends Phaser.Scene {
 
       panel(this, cx, cy, cardW, cardH, { border: diff.color, borderWidth: 4, radius: 12 });
       this.add.text(cx - cardW / 2 + 42, cy, seal.kanji, {
-        fontSize: '56px', fontStyle: 'bold', color: CSS.outline,
+        fontFamily: KANJI_FONT, fontSize: '56px', fontStyle: 'bold', color: CSS.outline,
       }).setOrigin(0.5);
       this.add.text(cx - cardW / 2 + 86, cy - 16, seal.name, {
         fontSize: '24px', fontStyle: 'bold', color: CSS.outline,
@@ -57,7 +59,7 @@ export default class CodexScene extends Phaser.Scene {
         fontSize: '14px', fontFamily: 'monospace', color: '#6a5535',
       }).setOrigin(0, 0.5);
 
-      if (PLAYABLE.includes(seal.id)) {
+      if (SHOW_BADGE && PLAYABLE.includes(seal.id)) {
         const bx = cx + cardW / 2 - 46, by = cy - cardH / 2 + 2;
         const g = this.add.graphics();
         g.fillStyle(C.orange, 1).fillRoundedRect(bx - 42, by - 13, 84, 26, 13);
