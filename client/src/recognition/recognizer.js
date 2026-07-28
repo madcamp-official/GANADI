@@ -23,30 +23,40 @@
 // ※ 인자·반환을 객체로 묶은 이유: 나중에 필드가 늘어도 호출부가 안 깨진다.
 
 import { extractFeatures } from './features.js';
+import { extractFeaturesV2 } from './featuresV2.js';
 import { classifyCentroid } from './classifyCentroid.js';
-// import { classifyMLP } from './mlpModel.js'; // Day 5 교체 대상
+import { classifyMLP, loadMLP } from './mlpModel.js';
 import { RECOGNITION } from '../config.js';
 import { RULES } from '../../../shared/constants.js';
 
-const USE_MLP = false; // Day 5에 true로. 폴백 플래그로 센트로이드 구현 유지 (§4.6).
+// 폴백 플래그 (§4.6) — 시연 직전 MLP가 이상하면 이 한 줄로 센트로이드로 돌아간다.
+// ★ 센트로이드 경로를 지우지 말 것. 두 경로는 특징도 다르다(v1 90차원 vs v2 182차원).
+const USE_MLP = true;
 
 /**
  * 한 프레임 판별 — 상태 없는 순수 함수.
  * ★ export를 유지할 것: 웹캠 없이 저장된 데이터(data.json의 원시 landmarks)를
  *   그대로 흘려보내 정확도를 뽑는 통로다. Step 4 검증·Day 4 혼동행렬이 이걸로 돌아간다.
+ *   ⚠️ USE_MLP=true인 지금 이 통로는 브라우저 전용이다 — loadMLP()가 fetch로 모델을 받으므로
+ *      node에서는 not-loaded만 나온다. 오프라인 채점은 tools/trainMLP.mjs --holdout 을 쓸 것.
  * 임계값·런너업 마진 판정은 분류기 안에서 끝난다. best/second/reason은 튜닝용 진단 정보.
  * @param {Array<Array<{x:number,y:number,z:number}>>} hands
  * @returns {{ sealId: string|null, confidence: number, reason?: string }}
  */
 export function classify(hands) {
   if (!hands?.length) return { sealId: null, confidence: 0, reason: 'no-hands' };
-  const feat = extractFeatures(hands);
+  // ★ 특징이 경로마다 다르다. MLP는 v2(182, PIP 포함), 센트로이드는 v1(90).
+  //   섞어 넣으면 에러 없이 오답만 나온다.
   return USE_MLP
-    ? { sealId: null, confidence: 0, reason: 'mlp-todo' } // TODO: classifyMLP(feat)
-    : classifyCentroid(feat);
+    ? classifyMLP(extractFeaturesV2(hands))
+    : classifyCentroid(extractFeatures(hands));
 }
 
 export async function createRecognizer() {
+  // 모델이 준비되기 전에 첫 프레임이 들어오면 전부 not-loaded로 흘러간다.
+  // 호출부(handTracker)가 이 함수를 await 하므로 여기서 받아두면 그 창이 닫힌다.
+  if (USE_MLP) await loadMLP();
+
   const votes = [];
   let holdSeal = null;
   let holdStart = 0;

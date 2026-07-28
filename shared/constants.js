@@ -21,8 +21,14 @@ export const EASY_SEAL_IDS = ['dog', 'monkey', 'tiger', 'horse', 'rat', 'rabbit'
 
 // 실전 시퀀스에 투입하는 인장 (§4.5 — 도감엔 12종 전부, 실전엔 검증된 것만).
 // 서버 대전과 연습 모드가 같은 목록을 봐야 하므로 여기가 단일 출처.
-// 2026-07-27 기준 실손 검증된 3종. 호랑이·양은 손 겹침으로 아직 제외.
-export const PLAYABLE_SEAL_IDS = ['horse', 'dog', 'rooster'];
+// 2026-07-28 MLP 교체 후 11종으로 확대. 근거: 학습에 없던 제3자 세션(seals_2026-07-28_390f)을
+// 시험지로 놓고 4회 채점 — 아래 11종은 4회 전부 100%였다.
+// 'goat'만 제외한다. 같은 조건에서 0/100/3/100%로 흔들리고, 틀릴 때 tiger·rat으로 간다
+// (재수집으로 자세를 맞춘 뒤에도 남은 유일한 인장 — 자세가 아니라 손 모양 자체가 다를 가능성).
+export const PLAYABLE_SEAL_IDS = [
+  'rat', 'ox', 'tiger', 'rabbit', 'dragon', 'snake',
+  'horse', 'monkey', 'rooster', 'dog', 'pig',
+];
 
 // Socket.IO 이벤트명
 export const EVENTS = {

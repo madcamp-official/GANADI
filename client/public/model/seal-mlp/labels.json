@@ -1,0 +1,30 @@
+{
+  "labels": [
+    "dog",
+    "dragon",
+    "goat",
+    "horse",
+    "monkey",
+    "none",
+    "ox",
+    "pig",
+    "rabbit",
+    "rat",
+    "rooster",
+    "snake",
+    "tiger"
+  ],
+  "trainedAt": "2026-07-28T12:14:39.875Z",
+  "sessions": [
+    "seals_2026-07-25_360f_360img",
+    "seals_2026-07-27_420f_420img",
+    "seals_2026-07-28_120f_120img",
+    "seals_2026-07-28_390f_390img"
+  ],
+  "holdout": null,
+  "mult": 5,
+  "epochs": 200,
+  "seed": 20260728,
+  "featureVersion": "v2",
+  "inputDim": 182
+}
