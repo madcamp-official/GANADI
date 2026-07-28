@@ -13,7 +13,7 @@ import { getCharacter, spriteKey } from '../data/characters.js';
 import { getSocket } from '../net/socket.js';
 import { startVideoCall } from '../net/webrtc.js';
 import { GAME } from '../config.js';
-import { drawForest, darkPanel, pill, CSS, C, hex, hiDPI } from '../ui/theme.js';
+import { drawForest, darkPanel, pill, CSS, C, hex, hiDPI, KANJI_FONT } from '../ui/theme.js';
 import { holdGaugeView } from '../ui/holdGauge.js';
 
 const W = GAME.WIDTH, H = GAME.HEIGHT;
@@ -312,13 +312,13 @@ export default class BattleScene extends Phaser.Scene {
       this.sealRow.add(g);
 
       const kanji = this.add.text(x, y - 18, seal.kanji, {
-        fontSize: '72px', fontStyle: 'bold', color: future ? '#b9a888' : CSS.outline,
+        fontFamily: KANJI_FONT, fontSize: '72px', fontStyle: 'bold', color: future ? '#b9a888' : CSS.outline,
       }).setOrigin(0.5);
       const name = this.add.text(x, y + 62, seal.name, { fontSize: '18px', color: future ? '#a99a7a' : '#6a5535' }).setOrigin(0.5);
       this.sealRow.add([kanji, name]);
 
       if (done) {
-        const stamp = this.add.text(x + 30, y - 30, '印', { fontSize: '54px', fontStyle: 'bold', color: hex(C.orange) }).setOrigin(0.5).setAngle(-12).setAlpha(0.9);
+        const stamp = this.add.text(x + 30, y - 30, '印', { fontFamily: KANJI_FONT, fontSize: '54px', fontStyle: 'bold', color: hex(C.orange) }).setOrigin(0.5).setAngle(-12).setAlpha(0.9);
         this.sealRow.add(stamp);
       }
       if (current) {

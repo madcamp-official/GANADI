@@ -5,8 +5,23 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>나루도</title>
     <style>
+      /* 커스텀 글씨체 — client/public/fonts/game.ttf 에 파일을 넣으면 적용됨.
+         Bold용 파일이 따로 있으면 아래 @font-face를 하나 더 추가(font-weight:bold). */
+      @font-face {
+        font-family: 'GameFont';
+        src: url('/fonts/game.ttf') format('truetype');
+        font-weight: normal;
+        font-display: swap;
+      }
+      /* 한자 전용 (十二支·印·忍) — client/public/fonts/hanja.ttf */
+      @font-face {
+        font-family: 'KanjiFont';
+        src: url('/fonts/hanja.ttf') format('truetype');
+        font-display: swap;
+      }
       html, body { height: 100%; }
-      body { margin: 0; background: #16281c; overflow: hidden; }
+      body { margin: 0; background: #16281c; overflow: hidden;
+             font-family: 'GameFont', 'Malgun Gothic', sans-serif; }
       /* 게임 캔버스가 뷰포트를 꽉 채움. 중앙 정렬은 Phaser autoCenter가 담당 (CSS flex 중복 금지) */
       #game { width: 100vw; height: 100vh; }
       /* 상대/내 웹캠 프리뷰 — 캔버스 위 DOM 오버레이 (판정 미사용) */

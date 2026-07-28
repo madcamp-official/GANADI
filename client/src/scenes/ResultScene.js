@@ -3,7 +3,7 @@
 import Phaser from 'phaser';
 import { GAME } from '../config.js';
 import { getCharacter, spriteKey } from '../data/characters.js';
-import { drawForest, button, pill, CSS, C, hex, hiDPI } from '../ui/theme.js';
+import { drawForest, button, pill, CSS, C, hex, hiDPI, FONT } from '../ui/theme.js';
 
 export default class ResultScene extends Phaser.Scene {
   constructor() {
@@ -17,7 +17,7 @@ export default class ResultScene extends Phaser.Scene {
 
     // 타이틀 (그림자 + 팝 트윈)
     const title = this.add.text(W / 2, 180, won ? '승리' : '패배', {
-      fontFamily: 'sans-serif', fontSize: '120px', fontStyle: 'bold',
+      fontFamily: FONT, fontSize: '120px', fontStyle: 'bold',
       color: won ? CSS.win : CSS.lose,
     }).setOrigin(0.5).setShadow(0, 8, hex(C.woodShadow), 0, true, true);
     title.setScale(0.4).setAlpha(0);

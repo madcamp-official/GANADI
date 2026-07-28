@@ -6,7 +6,7 @@ import { EVENTS } from '../../../shared/constants.js';
 import { connect } from '../net/socket.js';
 import { DEFAULT_CHARACTER } from '../data/characters.js';
 import { GAME } from '../config.js';
-import { drawForest, button, CSS, C, hex, hiDPI } from '../ui/theme.js';
+import { drawForest, button, CSS, C, hex, hiDPI, FONT, KANJI_FONT } from '../ui/theme.js';
 
 export default class LobbyScene extends Phaser.Scene {
   constructor() {
@@ -21,7 +21,7 @@ export default class LobbyScene extends Phaser.Scene {
 
     // 타이틀
     this.add.text(W / 2, 150, '나루도', {
-      fontFamily: 'sans-serif', fontSize: '92px', fontStyle: 'bold', color: CSS.scroll,
+      fontFamily: FONT, fontSize: '92px', fontStyle: 'bold', color: CSS.scroll,
     }).setOrigin(0.5).setShadow(0, 6, hex(C.woodShadow), 0, true, true);
     this.add.text(W / 2, 222, '—  Narudo  —', {
       fontSize: '26px', fontStyle: 'bold', color: CSS.orange, letterSpacing: 4,
@@ -131,26 +131,27 @@ export default class LobbyScene extends Phaser.Scene {
 
 // --- 인라인 스타일 (두루마리 톤) ---
 const styPanel = `display:flex;flex-direction:column;gap:14px;width:520px;padding:26px;
-  box-sizing:border-box;font-family:sans-serif;background:#FAF1D8;
+  box-sizing:border-box;font-family:${FONT};background:#FAF1D8;
   border:5px solid #5A4632;border-radius:14px;box-shadow:0 7px 0 #3C2C1C;`;
 const styCreate = `width:100%;padding:16px;border:3px solid #C85A1B;border-radius:10px;cursor:pointer;
-  background:#FF7A2F;color:#FAF1D8;font-size:22px;font-weight:800;display:flex;
+  background:#FF7A2F;color:#FAF1D8;font-family:${FONT};font-size:22px;font-weight:800;display:flex;
   align-items:center;justify-content:center;gap:10px;`;
-const styKanji = `background:#FAF1D8;color:#FF7A2F;border-radius:6px;padding:1px 8px;font-size:18px;`;
+const styKanji = `background:#FAF1D8;color:#FF7A2F;border-radius:6px;padding:1px 8px;font-size:18px;
+  font-family:${KANJI_FONT};`;
 const styDivider = `text-align:center;border-top:2px dashed #C9B48A;position:relative;margin:6px 0;`;
 const styDivText = `position:relative;top:-14px;background:#FAF1D8;padding:0 12px;color:#8A6B4A;font-size:14px;`;
 const styInput = `flex:1;padding:14px;border:3px solid #5A4632;border-radius:10px;background:#FFFDF5;
-  color:#2A1D12;font-size:24px;font-weight:800;text-align:center;letter-spacing:8px;
+  color:#2A1D12;font-family:${FONT};font-size:24px;font-weight:800;text-align:center;letter-spacing:8px;
   text-transform:uppercase;box-sizing:border-box;`;
 const styJoin = `padding:0 26px;border:3px solid #234a29;border-radius:10px;cursor:pointer;
-  background:#3E6B3A;color:#FAF1D8;font-size:20px;font-weight:800;`;
+  background:#3E6B3A;color:#FAF1D8;font-family:${FONT};font-size:20px;font-weight:800;`;
 const styHint = `color:#8A6B4A;font-size:13px;`;
 const styErr = `color:#E5484D;font-size:14px;font-weight:700;`;
 const styStatus = `display:flex;align-items:center;gap:12px;padding:10px 22px;border-radius:24px;
-  background:rgba(26,42,30,.92);border:2px solid #5A4632;color:#FAF1D8;font-family:sans-serif;
+  background:rgba(26,42,30,.92);border:2px solid #5A4632;color:#FAF1D8;font-family:${FONT};
   font-size:18px;white-space:nowrap;`;
 const styCode = `user-select:all;color:#FF7A2F;font-family:monospace;font-size:22px;letter-spacing:3px;`;
 const styCopy = `padding:5px 12px;border:2px solid #5A4632;border-radius:8px;cursor:pointer;
-  background:#FAF1D8;color:#2A1D12;font-size:13px;font-weight:700;`;
+  background:#FAF1D8;color:#2A1D12;font-family:${FONT};font-size:13px;font-weight:700;`;
 const styPractice = `width:100%;margin-top:4px;padding:12px;border:3px solid #234a29;border-radius:10px;
-  cursor:pointer;background:#3E6B3A;color:#FAF1D8;font-size:16px;font-weight:800;`;
+  cursor:pointer;background:#3E6B3A;color:#FAF1D8;font-family:${FONT};font-size:16px;font-weight:800;`;
