@@ -9,14 +9,14 @@
          Bold용 파일이 따로 있으면 아래 @font-face를 하나 더 추가(font-weight:bold). */
       @font-face {
         font-family: 'GameFont';
-        src: url('/fonts/game.ttf') format('truetype');
+        src: url('/fonts/game.woff2') format('woff2');
         font-weight: normal;
         font-display: swap;
       }
-      /* 한자 전용 (十二支·印·忍) — client/public/fonts/hanja.ttf */
+      /* 한자 전용 (十二支·印·忍) — 쓰는 15자만 서브셋 */
       @font-face {
         font-family: 'KanjiFont';
-        src: url('/fonts/hanja.ttf') format('truetype');
+        src: url('/fonts/hanja.woff2') format('woff2');
         font-display: swap;
       }
       html, body { height: 100%; }
