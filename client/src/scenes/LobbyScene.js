@@ -142,9 +142,11 @@ const styDivider = `text-align:center;border-top:2px dashed #C9B48A;position:rel
 const styDivText = `position:relative;top:-14px;background:#FAF1D8;padding:0 12px;color:#8A6B4A;font-size:14px;`;
 const styInput = `flex:1;padding:14px;border:3px solid #5A4632;border-radius:10px;background:#FFFDF5;
   color:#2A1D12;font-family:${FONT};font-size:24px;font-weight:800;text-align:center;letter-spacing:8px;
-  text-transform:uppercase;box-sizing:border-box;`;
+  text-transform:uppercase;box-sizing:border-box;min-width:0;`;
+// flex-shrink:0 + nowrap — 입력창(flex:1)에 밀려 "입/장"으로 줄바꿈되는 것 방지
 const styJoin = `padding:0 26px;border:3px solid #234a29;border-radius:10px;cursor:pointer;
-  background:#3E6B3A;color:#FAF1D8;font-family:${FONT};font-size:20px;font-weight:800;`;
+  background:#3E6B3A;color:#FAF1D8;font-family:${FONT};font-size:20px;font-weight:800;
+  flex-shrink:0;white-space:nowrap;`;
 const styHint = `color:#8A6B4A;font-size:13px;`;
 const styErr = `color:#E5484D;font-size:14px;font-weight:700;`;
 const styStatus = `display:flex;align-items:center;gap:12px;padding:10px 22px;border-radius:24px;

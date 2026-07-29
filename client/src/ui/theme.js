@@ -5,11 +5,12 @@ import { GAME, RENDER_SCALE } from '../config.js';
 
 // 한글이 깨지지 않는 시스템 폰트 스택
 // 커스텀 글씨체 우선 (client/public/fonts/game.ttf). 없으면 시스템 한글 폰트로 폴백.
-export const FONT = '"GameFont", "Malgun Gothic", "Apple SD Gothic Neo", "Noto Sans KR", sans-serif';
+// 폰트명은 홑따옴표 — 인라인 style="..." 속성에 그대로 꽂히므로 큰따옴표를 쓰면 속성이 잘린다.
+export const FONT = "'GameFont', 'Malgun Gothic', 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif";
 
 // 한자(十二支·印·忍·인장) 전용 폰트. 커스텀(client/public/fonts/kanji.ttf) → 일본식 폰트 순.
 // 한글 폰트엔 한자 글리프가 없어 중국어(SC)로 폴백되는 걸 막는다.
-export const KANJI_FONT = '"KanjiFont", "Yu Mincho", "Hiragino Mincho ProN", "Noto Serif JP", "MS Mincho", serif';
+export const KANJI_FONT = "'KanjiFont', 'Yu Mincho', 'Hiragino Mincho ProN', 'Noto Serif JP', 'MS Mincho', serif";
 
 // 고해상도 렌더 + 텍스트 기본값 설치. 각 씬 create() 맨 앞에서 호출.
 // - 카메라를 RENDER_SCALE배 줌해 1280×720 좌표를 고해상도 버퍼에 그린다 (선명도).
