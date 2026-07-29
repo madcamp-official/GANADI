@@ -19,11 +19,11 @@ export default class LobbyScene extends Phaser.Scene {
     const W = GAME.WIDTH;
     drawForest(this);
 
-    // 타이틀
-    this.add.text(W / 2, 150, '나루도', {
+    // 타이틀 — 아래 폼 패널(중심 y = HEIGHT/2+70) 상단이 y≈215라 그보다 위에 둔다.
+    this.add.text(W / 2, 112, '나루도', {
       fontFamily: FONT, fontSize: '92px', fontStyle: 'bold', color: CSS.scroll,
     }).setOrigin(0.5).setShadow(0, 6, hex(C.woodShadow), 0, true, true);
-    this.add.text(W / 2, 222, '—  Narudo  —', {
+    this.add.text(W / 2, 184, '—  Narudo  —', {
       fontSize: '26px', fontStyle: 'bold', color: CSS.orange, letterSpacing: 4,
     }).setOrigin(0.5);
 
