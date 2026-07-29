@@ -20,6 +20,22 @@ const CPU_ID = '__cpu__';            // 연습 모드의 가상 상대
 
 const NEXT_ROUND_DELAY_MS = 2000;    // referee.js와 같은 간격
 
+// 좌우 진영 — 내 쪽 = 왼쪽, 상대 = 오른쪽. HP 패널(좌=나 / 우=상대)과 같은 편에 둔다.
+// 캐릭터·웹캠·발사체 방향이 전부 이 상수를 따르므로 진영을 바꾸려면 여기만 뒤집으면 된다.
+const ME_X = 110, OPP_X = W - 110;
+const FIRE_FROM = ME_X + 50, FIRE_TO = OPP_X - 40; // 발사체 시작/착탄 x
+
+// HP 패널 — 좌(나)/우(상대)를 같은 크기로, 화면 중앙 기준 대칭 배치.
+// 텍스트·바 좌표를 전부 아래 값에서 유도하므로 한쪽만 어긋날 일이 없다.
+const HP_PANEL_W = 430, HP_PANEL_H = 78, HP_PANEL_CY = 62, HP_PAD = 20;
+const HP_L_CX = 240, HP_R_CX = W - HP_L_CX;   // 패널 중심 x
+// 각 패널의 안쪽 좌/우 끝 — 이름은 바깥쪽, HP 숫자는 안쪽에 붙인다.
+const L_IN = HP_L_CX - HP_PANEL_W / 2 + HP_PAD, L_OUT = HP_L_CX + HP_PANEL_W / 2 - HP_PAD;
+const R_IN = HP_R_CX - HP_PANEL_W / 2 + HP_PAD, R_OUT = HP_R_CX + HP_PANEL_W / 2 - HP_PAD;
+const HP_TEXT_Y = 40, HP_BAR_Y = 74, HP_BAR_W = 380, HP_BAR_H = 22;
+// 상대 진행 표시 — 패널 바깥 아래 (패널 하단 y = 101)
+const OPP_PROG_Y = 112, OPP_PROG_BAR_Y = 134;
+
 // 속성별 발사체 스프라이트시트 (client/public/effects/*). 프레임 크기는 시트를 실측해 맞춤.
 // file: public 기준 경로(공백 포함, encodeURI로 감쌈) · fw/fh: 한 프레임 픽셀 · frames: 총 프레임 수.
 const FX = {
@@ -115,21 +131,22 @@ export default class BattleScene extends Phaser.Scene {
   }
 
   buildStaticUI() {
-    // 내 HP 패널 (좌상단)
-    darkPanel(this, 240, 62, 430, 78);
-    this.add.text(45, 40, `${this.meChar.name} · 나`, { fontSize: '20px', fontStyle: 'bold', color: CSS.scroll });
-    this.myHpText = this.add.text(435, 40, '', { fontSize: '18px', fontFamily: 'monospace', color: CSS.win }).setOrigin(1, 0);
+    // 내 HP 패널 (좌상단) — 이름은 바깥(좌), HP 숫자는 안쪽(우)
+    darkPanel(this, HP_L_CX, HP_PANEL_CY, HP_PANEL_W, HP_PANEL_H);
+    this.add.text(L_IN, HP_TEXT_Y, `${this.meChar.name} · 나`, { fontSize: '20px', fontStyle: 'bold', color: CSS.scroll });
+    this.myHpText = this.add.text(L_OUT, HP_TEXT_Y, '', { fontSize: '18px', fontFamily: 'monospace', color: CSS.win }).setOrigin(1, 0);
 
     // 라운드 패널 (중앙 상단)
     darkPanel(this, W / 2, 52, 150, 64);
     this.roundText = this.add.text(W / 2, 44, 'ROUND 1', { fontSize: '20px', fontStyle: 'bold', color: CSS.orange }).setOrigin(0.5);
     this.roundSub = this.add.text(W / 2, 68, '', { fontSize: '13px', fontFamily: 'monospace', color: '#9ab08f' }).setOrigin(0.5);
 
-    // 상대 HP + 진행 패널 (우상단)
-    darkPanel(this, 940, 74, 440, 108);
-    this.add.text(1145, 42, this.practice ? '연습 상대' : '상대', { fontSize: '20px', fontStyle: 'bold', color: CSS.lose }).setOrigin(1, 0);
-    this.oppHpText = this.add.text(735, 42, '', { fontSize: '18px', fontFamily: 'monospace', color: CSS.lose });
-    this.oppProgLabel = this.add.text(735, 96, this.practice ? '연습 모드' : '상대 진행 0/0', { fontSize: '14px', color: '#ffcc99' });
+    // 상대 HP 패널 (우상단) — 내 패널의 좌우 대칭. 이름은 바깥(우), HP 숫자는 안쪽(좌)
+    darkPanel(this, HP_R_CX, HP_PANEL_CY, HP_PANEL_W, HP_PANEL_H);
+    this.add.text(R_OUT, HP_TEXT_Y, this.practice ? '연습 상대' : '상대', { fontSize: '20px', fontStyle: 'bold', color: CSS.lose }).setOrigin(1, 0);
+    this.oppHpText = this.add.text(R_IN, HP_TEXT_Y, '', { fontSize: '18px', fontFamily: 'monospace', color: CSS.lose });
+    // 진행 표시는 패널 밖 아래로 — 패널 안에 넣으면 내 패널보다 높아져 좌우가 어긋난다
+    this.oppProgLabel = this.add.text(R_IN, OPP_PROG_Y, this.practice ? '연습 모드' : '상대 진행 0/0', { fontSize: '14px', color: '#ffcc99' });
 
     this.hpGfx = this.add.graphics();
     this.oppProgGfx = this.add.graphics();
@@ -175,14 +192,14 @@ export default class BattleScene extends Phaser.Scene {
 
   drawFighters() {
     const cy = 470;
-    // 내 캐릭터 = 오른쪽, 상대 = 왼쪽 (피격 흔들림용으로 보관)
-    this.meSprite = this.add.image(W - 110, cy, spriteKey(this.meChar.id));
+    // 내 캐릭터 = 왼쪽, 상대 = 오른쪽 (피격 흔들림용으로 보관)
+    this.meSprite = this.add.image(ME_X, cy, spriteKey(this.meChar.id));
     fit(this.meSprite, 200, 300);
-    pill(this, W - 110, cy + 150, '나', { fill: 0x2a3a2b, border: C.orange, textColor: CSS.orange, bold: true });
+    pill(this, ME_X, cy + 150, '나', { fill: 0x2a3a2b, border: C.orange, textColor: CSS.orange, bold: true });
 
-    this.oppSprite = this.add.image(110, cy, spriteKey(this.oppChar.id));
+    this.oppSprite = this.add.image(OPP_X, cy, spriteKey(this.oppChar.id));
     fit(this.oppSprite, 200, 300);
-    pill(this, 110, cy + 150, '상대', { fill: 0x2a3a2b, border: C.water, textColor: '#9fd0ff', bold: true });
+    pill(this, OPP_X, cy + 150, '상대', { fill: 0x2a3a2b, border: C.water, textColor: '#9fd0ff', bold: true });
   }
 
   // 웹캠을 각 캐릭터 머리 위(월드 좌표)로 배치. 캔버스 화면 좌표로 변환.
@@ -209,8 +226,8 @@ export default class BattleScene extends Phaser.Scene {
       el.style.height = `${camH * sy}px`;
       el.style.zIndex = '10';
     };
-    place(this.localCam, W - 120);              // 내 캐릭터 (우)
-    if (!this.practice) place(this.remoteCam, 120); // 상대 캐릭터 (좌)
+    place(this.localCam, ME_X);                    // 내 캐릭터 (좌)
+    if (!this.practice) place(this.remoteCam, OPP_X); // 상대 캐릭터 (우)
   }
 
   restoreCams() {
@@ -350,7 +367,7 @@ export default class BattleScene extends Phaser.Scene {
     if (this.practice) return; // 연습 모드엔 상대가 없다
     this.oppProgLabel?.setText(`상대 진행 ${progress}/${total}`);
     if (!this.oppProgGfx) return;
-    const x = 850, y = 90, w = 260, h = 16;
+    const x = R_IN, y = OPP_PROG_BAR_Y, w = 260, h = 16;
     this.oppProgGfx.clear();
     this.oppProgGfx.fillStyle(0x1a1030, 1).fillRoundedRect(x, y, w, h, h / 2);
     if (total > 0 && progress > 0) {
@@ -365,7 +382,7 @@ export default class BattleScene extends Phaser.Scene {
     this.banner.setText(iWon ? '술법 발동!' : '피격!').setColor(iWon ? CSS.win : '#ff9a9a');
     this.time.delayedCall(900, () => this.banner.setText(''));
     this.cameras.main.shake(220, iWon ? 0.003 : 0.008);
-    // 내 캐릭터=우, 상대=좌. 승리 시 상대(좌)에 술법, 패배 시 내(우) 피격.
+    // 내 캐릭터=좌, 상대=우. 승리 시 상대(우)에 술법, 패배 시 내(좌) 피격.
     if (iWon) {
       // 완성한 인술의 속성 이펙트를 상대에게 발사 (착탄 시 상대가 흔들림)
       if (this.currentJutsu) this.fireAttack(this.currentJutsu.element);
@@ -373,16 +390,16 @@ export default class BattleScene extends Phaser.Scene {
     } else { this.shakeSprite(this.meSprite); this.flashRed(); }
   }
 
-  // 속성 공격 애니메이션을 내(우) → 상대(좌)로 발사. 에셋 없으면 기존 링 이펙트로 폴백.
+  // 속성 공격 애니메이션을 내(좌) → 상대(우)로 발사. 에셋 없으면 기존 링 이펙트로 폴백.
   fireAttack(element) {
     const fx = FX[element];
-    if (!fx) return this.jutsu(110, 470, FX_COLOR[element] ?? C.win);
+    if (!fx) return this.jutsu(OPP_X, 470, FX_COLOR[element] ?? C.win);
     const key = `fx-${element}`;
     const run = () => this.launchProjectile(key, element);
     if (this.textures.exists(key)) return run();
     this.load.spritesheet(key, encodeURI(`/effects/${fx.file}`), { frameWidth: fx.fw, frameHeight: fx.fh });
     this.load.once('complete', () => { if (this.scene.isActive()) run(); });
-    this.load.once('loaderror', () => { if (this.scene.isActive()) this.jutsu(110, 470, FX_COLOR[element] ?? C.win); });
+    this.load.once('loaderror', () => { if (this.scene.isActive()) this.jutsu(OPP_X, 470, FX_COLOR[element] ?? C.win); });
     this.load.start();
   }
 
@@ -395,12 +412,12 @@ export default class BattleScene extends Phaser.Scene {
       });
     }
     // 발사 지점 머즐 플래시
-    this.spark(W - 150, 470, color);
-    const p = this.add.sprite(W - 160, 470, key).setDepth(60).play(key);
-    p.setFlipX(true); // 아트는 오른쪽 진행 기준 → 좌측(상대)로 향하게 뒤집기
+    this.spark(FIRE_FROM, 470, color);
+    const p = this.add.sprite(FIRE_FROM, 470, key).setDepth(60).play(key);
+    // 아트가 오른쪽 진행 기준이라 우측(상대)으로 갈 땐 뒤집지 않는다
     p.setScale(300 / fx.fh); // 프레임 높이를 ~300px로 (크게)
     this.tweens.add({
-      targets: p, x: 150, duration: 1200, ease: 'Sine.inOut',
+      targets: p, x: FIRE_TO, duration: 1200, ease: 'Sine.inOut',
       onComplete: () => { p.destroy(); this.shakeSprite(this.oppSprite); }, // 착탄: 캐릭터 흔들림
     });
   }
@@ -424,17 +441,15 @@ export default class BattleScene extends Phaser.Scene {
     this.myHpText.setText(`${myHp} / ${RULES.MAX_HP}`);
     this.oppHpText.setText(`${oppHp} / ${RULES.MAX_HP}`);
 
-    const H2 = 22;
+    const H2 = HP_BAR_H, r = H2 / 2;
     this.hpGfx.clear();
-    // 내 바 (좌 패널 25~455 안쪽, 초록, 좌→우)
-    const mx = 45, my = 74, mw = 380;
-    this.hpGfx.fillStyle(0x1a1030, 1).fillRoundedRect(mx, my, mw, H2, H2 / 2);
-    this.hpGfx.fillStyle(C.win, 1).fillRoundedRect(mx, my, mw * (myHp / RULES.MAX_HP), H2, H2 / 2);
-    // 상대 바 (우 패널 720~1160 안쪽, 빨강, 우→좌로 줆)
-    const ow = 380, oRight = 1145, oy = 64;
-    this.hpGfx.fillStyle(0x1a1030, 1).fillRoundedRect(oRight - ow, oy, ow, H2, H2 / 2);
-    const fw = ow * (oppHp / RULES.MAX_HP);
-    this.hpGfx.fillStyle(C.lose, 1).fillRoundedRect(oRight - fw, oy, fw, H2, H2 / 2);
+    // 내 바 (좌 패널 안쪽, 초록, 좌→우로 줆)
+    this.hpGfx.fillStyle(0x1a1030, 1).fillRoundedRect(L_IN, HP_BAR_Y, HP_BAR_W, H2, r);
+    this.hpGfx.fillStyle(C.win, 1).fillRoundedRect(L_IN, HP_BAR_Y, HP_BAR_W * (myHp / RULES.MAX_HP), H2, r);
+    // 상대 바 (우 패널 안쪽, 빨강, 우→좌로 줆 — 내 바와 좌우 대칭)
+    this.hpGfx.fillStyle(0x1a1030, 1).fillRoundedRect(R_OUT - HP_BAR_W, HP_BAR_Y, HP_BAR_W, H2, r);
+    const fw = HP_BAR_W * (oppHp / RULES.MAX_HP);
+    this.hpGfx.fillStyle(C.lose, 1).fillRoundedRect(R_OUT - fw, HP_BAR_Y, fw, H2, r);
   }
 
   onMatchOver({ winner }) {
