@@ -33,8 +33,10 @@ const HP_L_CX = 240, HP_R_CX = W - HP_L_CX;   // 패널 중심 x
 const L_IN = HP_L_CX - HP_PANEL_W / 2 + HP_PAD, L_OUT = HP_L_CX + HP_PANEL_W / 2 - HP_PAD;
 const R_IN = HP_R_CX - HP_PANEL_W / 2 + HP_PAD, R_OUT = HP_R_CX + HP_PANEL_W / 2 - HP_PAD;
 const HP_TEXT_Y = 40, HP_BAR_Y = 74, HP_BAR_W = 380, HP_BAR_H = 22;
-// 상대 진행 표시 — 패널 바깥 아래 (패널 하단 y = 101)
-const OPP_PROG_Y = 112, OPP_PROG_BAR_Y = 134;
+// 상대 진행 표시 — 패널 바깥 아래 (패널 하단 y = 101).
+// 라벨 y는 글자 상단이 아니라 박스 상단 — theme의 add.text 기본 padding(top:10)만큼 밀려 그려진다.
+// 14px 글자는 y+10 ~ y+28 을 차지하므로 바는 그 아래로 띄운다.
+const OPP_PROG_Y = 104, OPP_PROG_BAR_Y = 138;
 
 // 속성별 발사체 스프라이트시트 (client/public/effects/*). 프레임 크기는 시트를 실측해 맞춤.
 // file: public 기준 경로(공백 포함, encodeURI로 감쌈) · fw/fh: 한 프레임 픽셀 · frames: 총 프레임 수.
@@ -146,7 +148,8 @@ export default class BattleScene extends Phaser.Scene {
     this.add.text(R_OUT, HP_TEXT_Y, this.practice ? '연습 상대' : '상대', { fontSize: '20px', fontStyle: 'bold', color: CSS.lose }).setOrigin(1, 0);
     this.oppHpText = this.add.text(R_IN, HP_TEXT_Y, '', { fontSize: '18px', fontFamily: 'monospace', color: CSS.lose });
     // 진행 표시는 패널 밖 아래로 — 패널 안에 넣으면 내 패널보다 높아져 좌우가 어긋난다
-    this.oppProgLabel = this.add.text(R_IN, OPP_PROG_Y, this.practice ? '연습 모드' : '상대 진행 0/0', { fontSize: '14px', color: '#ffcc99' });
+    // depth — 아래에서 만드는 진행 바(graphics)에 글자가 덮이지 않게
+    this.oppProgLabel = this.add.text(R_IN, OPP_PROG_Y, this.practice ? '연습 모드' : '상대 진행 0/0', { fontSize: '14px', color: '#ffcc99' }).setDepth(1);
 
     this.hpGfx = this.add.graphics();
     this.oppProgGfx = this.add.graphics();
