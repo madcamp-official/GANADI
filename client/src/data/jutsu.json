@@ -1,0 +1,104 @@
+{
+  "jutsu": [
+    {
+      "id": "great-fireball-jutsu",
+      "name_kr": "화둔·호화구의 술",
+      "name_en": "Fire Release: Great Fireball Technique",
+      "element": "FIRE",
+      "seal_count": 6,
+      "seals": ["SNAKE", "RAM", "MONKEY", "BOAR", "HORSE", "TIGER"],
+      "seals_kr": ["사", "미", "신", "해", "오", "인"],
+      "description": "입에서 거대한 불덩이를 뿜어 넓은 범위를 태운다."
+    },
+    {
+      "id": "phoenix-sage-fire-jutsu",
+      "name_kr": "화둔·봉선화의 술",
+      "name_en": "Fire Release: Phoenix Sage Fire Technique",
+      "element": "FIRE",
+      "seal_count": 5,
+      "seals": ["RAT", "TIGER", "DOG", "OX", "RABBIT"],
+      "seals_kr": ["자", "인", "술", "축", "묘"],
+      "description": "여러 개의 작은 불덩이를 연사로 흩뿌린다."
+    },
+    {
+      "id": "water-dragon-bullet-jutsu",
+      "name_kr": "수둔·수룡탄의 술",
+      "name_en": "Water Release: Water Dragon Bullet Technique",
+      "element": "WATER",
+      "seal_count": 7,
+      "seals": ["OX", "MONKEY", "RABBIT", "RAT", "BOAR", "TIGER", "SNAKE"],
+      "seals_kr": ["축", "신", "묘", "자", "해", "인", "사"],
+      "description": "거대한 물의 용을 만들어 상대에게 돌진시킨다."
+    },
+    {
+      "id": "water-shark-bomb-jutsu",
+      "name_kr": "수둔·수상어탄의 술",
+      "name_en": "Water Release: Water Shark Bomb Technique",
+      "element": "WATER",
+      "seal_count": 4,
+      "seals": ["TIGER", "OX", "BOAR", "DRAGON"],
+      "seals_kr": ["인", "축", "해", "진"],
+      "description": "상어 형상의 물덩이로 강하게 들이받는다."
+    },
+    {
+      "id": "earth-style-wall",
+      "name_kr": "토둔·토류벽",
+      "name_en": "Earth Release: Earth-Style Wall",
+      "element": "EARTH",
+      "seal_count": 3,
+      "seals": ["BOAR", "HORSE", "DOG"],
+      "seals_kr": ["해", "오", "술"],
+      "description": "흙벽을 솟구쳐 공격을 막는 방어 인술."
+    },
+    {
+      "id": "earth-head-hunter-jutsu",
+      "name_kr": "토둔·이중식파의 술",
+      "name_en": "Earth Release: Double Suicide Decapitation Technique",
+      "element": "EARTH",
+      "seal_count": 4,
+      "seals": ["SNAKE", "RAM", "BOAR", "DRAGON"],
+      "seals_kr": ["사", "미", "해", "진"],
+      "description": "땅속에서 상대를 붙잡아 지면 아래로 끌어당긴다."
+    },
+    {
+      "id": "wind-great-breakthrough",
+      "name_kr": "풍둔·대돌파",
+      "name_en": "Wind Release: Great Breakthrough",
+      "element": "WIND",
+      "seal_count": 3,
+      "seals": ["RABBIT", "RAT", "DOG"],
+      "seals_kr": ["묘", "자", "술"],
+      "description": "강력한 돌풍을 일으켜 광범위하게 날려버린다."
+    },
+    {
+      "id": "wind-vacuum-sphere",
+      "name_kr": "풍둔·진공옥",
+      "name_en": "Wind Release: Vacuum Sphere",
+      "element": "WIND",
+      "seal_count": 4,
+      "seals": ["DRAGON", "RABBIT", "TIGER", "DOG"],
+      "seals_kr": ["진", "묘", "인", "술"],
+      "description": "압축한 바람 구슬을 총알처럼 연속으로 발사한다."
+    },
+    {
+      "id": "chidori",
+      "name_kr": "뇌둔·치도리",
+      "name_en": "Lightning Release: Chidori",
+      "element": "LIGHTNING",
+      "seal_count": 5,
+      "seals": ["OX", "RABBIT", "MONKEY", "DRAGON", "RAT"],
+      "seals_kr": ["축", "묘", "신", "진", "자"],
+      "description": "손에 번개를 모아 관통력 높은 일격으로 돌진한다."
+    },
+    {
+      "id": "lightning-false-darkness",
+      "name_kr": "뇌둔·거짓 어둠",
+      "name_en": "Lightning Release: False Darkness",
+      "element": "LIGHTNING",
+      "seal_count": 4,
+      "seals": ["MONKEY", "DRAGON", "RAT", "OX"],
+      "seals_kr": ["신", "진", "자", "축"],
+      "description": "창 모양의 번개를 뻗어 여러 갈래로 꿰뚫는다."
+    }
+  ]
+}
