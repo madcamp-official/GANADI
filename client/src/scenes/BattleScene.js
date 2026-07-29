@@ -32,7 +32,9 @@ const HP_L_CX = 240, HP_R_CX = W - HP_L_CX;   // 패널 중심 x
 // 각 패널의 안쪽 좌/우 끝 — 이름은 바깥쪽, HP 숫자는 안쪽에 붙인다.
 const L_IN = HP_L_CX - HP_PANEL_W / 2 + HP_PAD, L_OUT = HP_L_CX + HP_PANEL_W / 2 - HP_PAD;
 const R_IN = HP_R_CX - HP_PANEL_W / 2 + HP_PAD, R_OUT = HP_R_CX + HP_PANEL_W / 2 - HP_PAD;
-const HP_TEXT_Y = 40, HP_BAR_Y = 74, HP_BAR_W = 380, HP_BAR_H = 22;
+// 이름·HP 숫자 행은 패널 상단(y=23)에 붙인다. add.text 기본 padding(top:10) 때문에
+// 실제 글자는 HP_TEXT_Y + 10 부터 그려지므로 그만큼 빼서 잡는다.
+const HP_TEXT_Y = 20, HP_BAR_Y = 74, HP_BAR_W = 380, HP_BAR_H = 22;
 // 상대 진행 표시 — 패널 바깥 아래 (패널 하단 y = 101).
 // 라벨 y는 글자 상단이 아니라 박스 상단 — theme의 add.text 기본 padding(top:10)만큼 밀려 그려진다.
 // 14px 글자는 y+10 ~ y+28 을 차지하므로 바는 그 아래로 띄운다.
