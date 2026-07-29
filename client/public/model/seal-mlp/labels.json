@@ -14,17 +14,18 @@
     "snake",
     "tiger"
   ],
-  "trainedAt": "2026-07-28T12:14:39.875Z",
+  "trainedAt": "2026-07-29T07:30:43.190Z",
   "sessions": [
     "seals_2026-07-25_360f_360img",
     "seals_2026-07-27_420f_420img",
     "seals_2026-07-28_120f_120img",
-    "seals_2026-07-28_390f_390img"
+    "seals_2026-07-29_240f_240img"
   ],
-  "holdout": null,
+  "holdout": "seals_2026-07-28_390f_390img",
   "mult": 5,
   "epochs": 200,
   "seed": 20260728,
   "featureVersion": "v2",
-  "inputDim": 182
+  "inputDim": 182,
+  "negativeClass": true
 }
