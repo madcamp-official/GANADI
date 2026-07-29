@@ -60,7 +60,7 @@ export default class CharacterSelectScene extends Phaser.Scene {
     });
 
     // 하단: 고른 닌자 pill + 선택 완료 버튼
-    this.chosenPill = pill(this, W / 2 - 170, GAME.HEIGHT - 54, '닌자를 고르세요', { fill: 0x2a3a2b });
+    this.setChosenPill('닌자를 고르세요');
     this.confirm = button(this, W / 2 + 90, GAME.HEIGHT - 54, 260, 62, '선택 완료', { color: C.scrollDark, fontSize: '24px' });
     this.confirm.zone.disableInteractive();
     this.confirm.t.setColor('#9a8a6a');
@@ -78,7 +78,7 @@ export default class CharacterSelectScene extends Phaser.Scene {
       card.badge.g.setVisible(on); card.badge.t.setVisible(on);
     });
 
-    this.chosenPill.t.setText(`고른 닌자  ${ch.name} · ${ch.element}`);
+    this.setChosenPill(`고른 닌자  ${ch.name} · ${ch.element}`);
     // 확인 버튼 활성화
     this.confirm.g.clear();
     const w = 260, h = 62, x = GAME.WIDTH / 2 + 90 - w / 2, y = GAME.HEIGHT - 54 - h / 2;
@@ -88,6 +88,12 @@ export default class CharacterSelectScene extends Phaser.Scene {
     this.confirm.t.setColor(CSS.outline);
     this.confirm.zone.setInteractive({ useHandCursor: true }).off('pointerdown')
       .on('pointerdown', () => this.scene.start('HandCheck'));
+  }
+
+  // pill을 새 텍스트 크기에 맞게 다시 그림 (setText만 하면 배경이 고정이라 글자가 튀어나온다)
+  setChosenPill(text) {
+    if (this.chosenPill) { this.chosenPill.g.destroy(); this.chosenPill.t.destroy(); }
+    this.chosenPill = pill(this, GAME.WIDTH / 2 - 210, GAME.HEIGHT - 54, text, { fill: 0x2a3a2b });
   }
 }
 

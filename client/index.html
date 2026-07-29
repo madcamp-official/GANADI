@@ -7,16 +7,18 @@
     <style>
       /* 커스텀 글씨체 — client/public/fonts/game.ttf 에 파일을 넣으면 적용됨.
          Bold용 파일이 따로 있으면 아래 @font-face를 하나 더 추가(font-weight:bold). */
+      /* 단일 굵기 폰트라 weight 범위를 열어둠 — 버튼(font-weight:800)도 이 폰트로 잡히게 */
       @font-face {
         font-family: 'GameFont';
         src: url('/fonts/game.woff2') format('woff2');
-        font-weight: normal;
+        font-weight: 100 900;
         font-display: swap;
       }
       /* 한자 전용 (十二支·印·忍) — 쓰는 15자만 서브셋 */
       @font-face {
         font-family: 'KanjiFont';
         src: url('/fonts/hanja.woff2') format('woff2');
+        font-weight: 100 900;
         font-display: swap;
       }
       html, body { height: 100%; }
