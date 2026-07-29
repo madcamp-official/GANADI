@@ -42,8 +42,8 @@ export default class HandCheckScene extends Phaser.Scene {
     bg.lineStyle(6, C.woodDark, 1).strokeRoundedRect(this.box.x, this.box.y, bw, bh, 16);
     this.corners = this.add.graphics();
     this.drawCorners(C.orange);
-    drawPalm(this.add.graphics(), W / 2 - 120, this.box.y + bh / 2 + 20);
-    drawPalm(this.add.graphics(), W / 2 + 120, this.box.y + bh / 2 + 20);
+    drawPalm(this.add.graphics(), W / 2 - 120, this.box.y + bh / 2 + 20, -1); // 왼손(엄지 안쪽)
+    drawPalm(this.add.graphics(), W / 2 + 120, this.box.y + bh / 2 + 20, 1);  // 오른손
 
     // 하단 안내 + 홀드 바
     const py = GAME.HEIGHT - 110;
@@ -126,14 +126,15 @@ export default class HandCheckScene extends Phaser.Scene {
   }
 }
 
-function drawPalm(g, x, y) {
+// flip: 1=오른손(엄지 왼쪽), -1=왼손(엄지 오른쪽/안쪽으로 미러)
+function drawPalm(g, x, y, flip = 1) {
   g.lineStyle(6, C.sun, 0.9);
   g.strokeRoundedRect(x - 42, y - 10, 84, 90, 24);
   [-30, -10, 10, 30].forEach((dx, i) => {
     const len = i === 0 || i === 3 ? 60 : 78;
-    g.lineBetween(x + dx, y - 8, x + dx, y - 8 - len);
+    g.lineBetween(x + dx * flip, y - 8, x + dx * flip, y - 8 - len);
   });
-  g.lineBetween(x - 40, y + 10, x - 66, y - 18);
+  g.lineBetween(x - 40 * flip, y + 10, x - 66 * flip, y - 18); // 엄지
 }
 
 function isOpenPalm(lm) {

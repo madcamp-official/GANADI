@@ -119,6 +119,14 @@ export function button(scene, cx, cy, w, h, label, opts = {}) {
   return { zone, g, t, setLabel: (s) => t.setText(s) };
 }
 
+// 좌상단 "← 로비로" 버튼 (로비 이후 화면 공통). 최상위 depth로 올림.
+export function lobbyButton(scene, opts = {}) {
+  const b = button(scene, 92, 42, 150, 48, '← 로비로', { fontSize: '18px', ...opts });
+  b.g.setDepth(500); b.t.setDepth(501); b.zone.setDepth(501);
+  b.zone.on('pointerdown', () => scene.scene.start('Lobby'));
+  return b;
+}
+
 // 알약(pill) 라벨
 export function pill(scene, cx, cy, label, opts = {}) {
   const t = scene.add.text(cx, cy, label, {

@@ -6,8 +6,8 @@
 //   시연 때 서버가 죽어도 데모가 도는 안전망.
 
 import Phaser from 'phaser';
-import { EVENTS, RULES } from '../../../shared/constants.js';
-import { makeSequence } from '../../../shared/sequence.js';
+import { EVENTS, RULES, PLAYABLE_SEAL_IDS } from '../../../shared/constants.js';
+import { pickJutsu, jutsuSeals, damageFor } from '../../../shared/jutsu.js';
 import { SEALS } from '../data/seals.js';
 import { getCharacter, spriteKey } from '../data/characters.js';
 import { getSocket } from '../net/socket.js';
@@ -15,9 +15,9 @@ import { startVideoCall } from '../net/webrtc.js';
 import { GAME } from '../config.js';
 import { drawForest, darkPanel, pill, CSS, C, hex, hiDPI, KANJI_FONT } from '../ui/theme.js';
 import { holdGaugeView } from '../ui/holdGauge.js';
-
 const W = GAME.WIDTH, H = GAME.HEIGHT;
 const CPU_ID = '__cpu__';            // 연습 모드의 가상 상대
+
 const NEXT_ROUND_DELAY_MS = 2000;    // referee.js와 같은 간격
 
 export default class BattleScene extends Phaser.Scene {
@@ -87,15 +87,16 @@ export default class BattleScene extends Phaser.Scene {
     else if (data?.firstRound) this.onRoundStart(data.firstRound); // 로비가 넘긴 첫 라운드
   }
 
-  // ── 연습 모드: 서버 심판이 하던 일을 로컬에서 (referee.js와 같은 규칙) ──
+  // ── 연습 모드: 서버 심판이 하던 일을 로컬에서 ──
+  // 랜덤 인술 하나를 뽑아 그 인의 순서를 목표 시퀀스로 쓴다 (서버와 같은 pickJutsu).
   startPracticeRound() {
     this.round += 1;
-    const length = this.round <= 2 ? 3 : 5;
-    this.onRoundStart({ round: this.round, sequence: makeSequence(length) });
+    const j = pickJutsu(PLAYABLE_SEAL_IDS);
+    this.onRoundStart({ round: this.round, sequence: jutsuSeals(j), jutsu: j });
   }
 
   resolvePracticeRound() {
-    const damage = RULES.DAMAGE[this.sequence.length] ?? 0;
+    const damage = damageFor(this.sequence.length);
     this.hp[CPU_ID] = Math.max(0, this.hp[CPU_ID] - damage);
     this.onRoundResult({ winner: this.myId, hp: { ...this.hp } });
     if (this.hp[CPU_ID] <= 0) this.time.delayedCall(NEXT_ROUND_DELAY_MS, () => this.onMatchOver({ winner: this.myId }));
@@ -124,13 +125,11 @@ export default class BattleScene extends Phaser.Scene {
     this.drawHp();
     this.drawOppProgress(0, 0);
 
+    // 현재 인술 이름 (온라인·연습 공통) — 라운드 패널 아래
+    this.jutsuLabel = this.add.text(W / 2, 108, '', { fontSize: '22px', fontStyle: 'bold', color: CSS.orange }).setOrigin(0.5);
+
     // 목표 인장 라벨
     this.targetPill = pill(this, W / 2, 168, '목표 인장 0/0', { fill: 0x2a3a2b, textColor: CSS.orange, bold: true });
-
-    // 연습 모드 표시
-    if (this.practice) {
-      this.add.text(W / 2, 100, '연습 모드 · 서버 없이 혼자 진행', { fontSize: '15px', color: CSS.win }).setOrigin(0.5, 0);
-    }
 
     // 인장 타일 컨테이너
     this.sealRow = this.add.container(0, 0);
@@ -151,7 +150,7 @@ export default class BattleScene extends Phaser.Scene {
     log.lineStyle(3, C.woodDark, 0.6).strokeCircle(W / 2 - 150, 647, 12);
 
     // 배너 (술법/피격)
-    this.banner = this.add.text(W / 2, 120, '', { fontSize: '44px', fontStyle: 'bold', color: '#fff' }).setOrigin(0.5).setDepth(50);
+    this.banner = this.add.text(W / 2, 230, '', { fontSize: '44px', fontStyle: 'bold', color: '#fff' }).setOrigin(0.5).setDepth(50);
 
     // 인식 게이지 — 지금 무엇을 인식 중이고 홀드가 얼마나 찼는지 (§3.2)
     // 이게 없으면 "인식이 안 되는 것"과 "인식되는 중"을 구분할 수 없다.
@@ -212,8 +211,10 @@ export default class BattleScene extends Phaser.Scene {
     if (this.remoteCam) this.remoteCam.style.display = 'none';
   }
 
-  onRoundStart({ round, sequence }) {
+  onRoundStart({ round, sequence, jutsu }) {
     this.sequence = sequence;
+    this.currentJutsu = jutsu ?? null; // 서버가 보낸 인술 (온라인) 또는 연습에서 넘긴 것
+    this.jutsuLabel.setText(jutsu?.name_kr ?? '');
     this.progress = 0;
     this.locked = true;
     this.roundText.setText(`ROUND ${round}`);
@@ -354,8 +355,32 @@ export default class BattleScene extends Phaser.Scene {
     this.time.delayedCall(900, () => this.banner.setText(''));
     this.cameras.main.shake(220, iWon ? 0.003 : 0.008);
     // 내 캐릭터=우, 상대=좌. 승리 시 상대(좌)에 술법, 패배 시 내(우) 피격.
-    if (iWon) this.jutsu(110, 470, C.win);
-    else { this.jutsu(W - 110, 470, C.lose); this.flashRed(); }
+    if (iWon) {
+      // 완성한 인술의 속성 이펙트를 상대에게 발사 (연습 모드)
+      if (this.currentJutsu) this.fireAttack(this.currentJutsu.element);
+      else this.jutsu(110, 470, C.win);
+    } else { this.jutsu(W - 110, 470, C.lose); this.flashRed(); }
+  }
+
+  // 속성 공격 에셋을 내(우) → 상대(좌)로 발사. 에셋 없으면 기존 링 이펙트로 폴백.
+  fireAttack(element) {
+    const key = `fx-${element}`;
+    const run = () => this.launchProjectile(key, element);
+    if (this.textures.exists(key)) return run();
+    this.load.image(key, `/effects/${String(element).toLowerCase()}.png`);
+    this.load.once('complete', () => { if (this.scene.isActive()) run(); });
+    this.load.once('loaderror', () => { if (this.scene.isActive()) this.jutsu(110, 470, C.win); }); // 에셋 없음
+    this.load.start();
+  }
+
+  launchProjectile(key, element) {
+    const color = { FIRE: C.fire, WATER: C.water, EARTH: C.wood, WIND: C.wind, LIGHTNING: C.elec }[element] ?? C.win;
+    const p = this.add.image(W - 160, 470, key).setDepth(60);
+    p.setScale(Math.min(150 / p.width, 150 / p.height));
+    this.tweens.add({
+      targets: p, x: 150, angle: 360, duration: 520, ease: 'Quad.in',
+      onComplete: () => { p.destroy(); this.jutsu(110, 470, color); },
+    });
   }
 
   drawHp() {
