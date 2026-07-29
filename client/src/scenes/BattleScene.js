@@ -20,6 +20,17 @@ const CPU_ID = '__cpu__';            // 연습 모드의 가상 상대
 
 const NEXT_ROUND_DELAY_MS = 2000;    // referee.js와 같은 간격
 
+// 속성별 발사체 스프라이트시트 (client/public/effects/*). 프레임 크기는 시트를 실측해 맞춤.
+// file: public 기준 경로(공백 포함, encodeURI로 감쌈) · fw/fh: 한 프레임 픽셀 · frames: 총 프레임 수.
+const FX = {
+  FIRE:      { file: 'Fire Effect 1/Firebolt SpriteSheet.png',                    fw: 48, fh: 48, frames: 11, rate: 18 },
+  WATER:     { file: 'Water Ball - Spritesheet/WaterBall - Startup and Infinite.png', fw: 64, fh: 64, frames: 25, rate: 22 },
+  EARTH:     { file: 'Earth Effect 01/Earth projectile Spritesheet .png',          fw: 48, fh: 64, frames: 6,  rate: 14 },
+  WIND:      { file: 'Smoke Effect 01/Smoke VFX 1.png',                            fw: 48, fh: 32, frames: 9,  rate: 16 },
+  LIGHTNING: { file: 'Thunder Effect 01/Thunder Projectile 1/Thunder projectile1 w blur.png', fw: 32, fh: 32, frames: 5, rate: 20 },
+};
+const FX_COLOR = { FIRE: C.fire, WATER: C.water, EARTH: C.wood, WIND: C.wind, LIGHTNING: C.elec };
+
 export default class BattleScene extends Phaser.Scene {
   constructor() {
     super('Battle');
@@ -164,13 +175,13 @@ export default class BattleScene extends Phaser.Scene {
 
   drawFighters() {
     const cy = 470;
-    // 내 캐릭터 = 오른쪽, 상대 = 왼쪽
-    const me = this.add.image(W - 110, cy, spriteKey(this.meChar.id));
-    fit(me, 200, 300);
+    // 내 캐릭터 = 오른쪽, 상대 = 왼쪽 (피격 흔들림용으로 보관)
+    this.meSprite = this.add.image(W - 110, cy, spriteKey(this.meChar.id));
+    fit(this.meSprite, 200, 300);
     pill(this, W - 110, cy + 150, '나', { fill: 0x2a3a2b, border: C.orange, textColor: CSS.orange, bold: true });
 
-    const opp = this.add.image(110, cy, spriteKey(this.oppChar.id));
-    fit(opp, 200, 300);
+    this.oppSprite = this.add.image(110, cy, spriteKey(this.oppChar.id));
+    fit(this.oppSprite, 200, 300);
     pill(this, 110, cy + 150, '상대', { fill: 0x2a3a2b, border: C.water, textColor: '#9fd0ff', bold: true });
   }
 
@@ -356,30 +367,53 @@ export default class BattleScene extends Phaser.Scene {
     this.cameras.main.shake(220, iWon ? 0.003 : 0.008);
     // 내 캐릭터=우, 상대=좌. 승리 시 상대(좌)에 술법, 패배 시 내(우) 피격.
     if (iWon) {
-      // 완성한 인술의 속성 이펙트를 상대에게 발사 (연습 모드)
+      // 완성한 인술의 속성 이펙트를 상대에게 발사 (착탄 시 상대가 흔들림)
       if (this.currentJutsu) this.fireAttack(this.currentJutsu.element);
-      else this.jutsu(110, 470, C.win);
-    } else { this.jutsu(W - 110, 470, C.lose); this.flashRed(); }
+      else this.shakeSprite(this.oppSprite);
+    } else { this.shakeSprite(this.meSprite); this.flashRed(); }
   }
 
-  // 속성 공격 에셋을 내(우) → 상대(좌)로 발사. 에셋 없으면 기존 링 이펙트로 폴백.
+  // 속성 공격 애니메이션을 내(우) → 상대(좌)로 발사. 에셋 없으면 기존 링 이펙트로 폴백.
   fireAttack(element) {
+    const fx = FX[element];
+    if (!fx) return this.jutsu(110, 470, FX_COLOR[element] ?? C.win);
     const key = `fx-${element}`;
     const run = () => this.launchProjectile(key, element);
     if (this.textures.exists(key)) return run();
-    this.load.image(key, `/effects/${String(element).toLowerCase()}.png`);
+    this.load.spritesheet(key, encodeURI(`/effects/${fx.file}`), { frameWidth: fx.fw, frameHeight: fx.fh });
     this.load.once('complete', () => { if (this.scene.isActive()) run(); });
-    this.load.once('loaderror', () => { if (this.scene.isActive()) this.jutsu(110, 470, C.win); }); // 에셋 없음
+    this.load.once('loaderror', () => { if (this.scene.isActive()) this.jutsu(110, 470, FX_COLOR[element] ?? C.win); });
     this.load.start();
   }
 
   launchProjectile(key, element) {
-    const color = { FIRE: C.fire, WATER: C.water, EARTH: C.wood, WIND: C.wind, LIGHTNING: C.elec }[element] ?? C.win;
-    const p = this.add.image(W - 160, 470, key).setDepth(60);
-    p.setScale(Math.min(150 / p.width, 150 / p.height));
+    const fx = FX[element], color = FX_COLOR[element] ?? C.win;
+    if (!this.anims.exists(key)) {
+      this.anims.create({
+        key, frameRate: fx.rate, repeat: -1,
+        frames: this.anims.generateFrameNumbers(key, { start: 0, end: fx.frames - 1 }),
+      });
+    }
+    // 발사 지점 머즐 플래시
+    this.spark(W - 150, 470, color);
+    const p = this.add.sprite(W - 160, 470, key).setDepth(60).play(key);
+    p.setFlipX(true); // 아트는 오른쪽 진행 기준 → 좌측(상대)로 향하게 뒤집기
+    p.setScale(300 / fx.fh); // 프레임 높이를 ~300px로 (크게)
     this.tweens.add({
-      targets: p, x: 150, angle: 360, duration: 520, ease: 'Quad.in',
-      onComplete: () => { p.destroy(); this.jutsu(110, 470, color); },
+      targets: p, x: 150, duration: 1200, ease: 'Sine.inOut',
+      onComplete: () => { p.destroy(); this.shakeSprite(this.oppSprite); }, // 착탄: 캐릭터 흔들림
+    });
+  }
+
+  // 피격 캐릭터를 좌우로 짧게 흔든다 (퍼지는 이펙트 대신).
+  shakeSprite(spr) {
+    if (!spr) return;
+    const x0 = spr.x;
+    this.tweens.killTweensOf(spr);
+    spr.setX(x0);
+    this.tweens.add({
+      targets: spr, x: x0 + 14, duration: 45, yoyo: true, repeat: 5, ease: 'Sine.inOut',
+      onComplete: () => spr.setX(x0),
     });
   }
 
