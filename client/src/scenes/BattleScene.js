@@ -367,26 +367,32 @@ export default class BattleScene extends Phaser.Scene {
     this.cameras.main.shake(220, iWon ? 0.003 : 0.008);
     // 내 캐릭터=우, 상대=좌. 승리 시 상대(좌)에 술법, 패배 시 내(우) 피격.
     if (iWon) {
-      // 완성한 인술의 속성 이펙트를 상대에게 발사 (착탄 시 상대가 흔들림)
-      if (this.currentJutsu) this.fireAttack(this.currentJutsu.element);
+      // 이김: 완성한 인술 속성을 상대에게 발사 (착탄 시 상대가 흔들림)
+      if (this.currentJutsu) this.fireAttack(this.currentJutsu.element, false);
       else this.shakeSprite(this.oppSprite);
-    } else { this.shakeSprite(this.meSprite); this.flashRed(); }
+    } else {
+      // 짐: 같은 인술이 상대→나로 날아와 나를 때린다 (착탄 시 흔들림+붉은 플래시)
+      if (this.currentJutsu) this.fireAttack(this.currentJutsu.element, true);
+      else this.shakeSprite(this.meSprite);
+    }
   }
 
-  // 속성 공격 애니메이션을 내(우) → 상대(좌)로 발사. 에셋 없으면 기존 링 이펙트로 폴백.
-  fireAttack(element) {
+  // 속성 공격 애니메이션 발사. incoming=false: 내(우)→상대(좌) 공격 / true: 상대(좌)→나(우) 피격.
+  // 에셋 없으면 대상 캐릭터 흔들림으로 폴백.
+  fireAttack(element, incoming = false) {
+    const target = incoming ? this.meSprite : this.oppSprite;
     const fx = FX[element];
-    if (!fx) return this.jutsu(110, 470, FX_COLOR[element] ?? C.win);
+    if (!fx) return this.shakeSprite(target);
     const key = `fx-${element}`;
-    const run = () => this.launchProjectile(key, element);
+    const run = () => this.launchProjectile(key, element, incoming);
     if (this.textures.exists(key)) return run();
     this.load.spritesheet(key, encodeURI(`/effects/${fx.file}`), { frameWidth: fx.fw, frameHeight: fx.fh });
     this.load.once('complete', () => { if (this.scene.isActive()) run(); });
-    this.load.once('loaderror', () => { if (this.scene.isActive()) this.jutsu(110, 470, FX_COLOR[element] ?? C.win); });
+    this.load.once('loaderror', () => { if (this.scene.isActive()) this.shakeSprite(target); });
     this.load.start();
   }
 
-  launchProjectile(key, element) {
+  launchProjectile(key, element, incoming = false) {
     const fx = FX[element], color = FX_COLOR[element] ?? C.win;
     if (!this.anims.exists(key)) {
       this.anims.create({
@@ -394,14 +400,16 @@ export default class BattleScene extends Phaser.Scene {
         frames: this.anims.generateFrameNumbers(key, { start: 0, end: fx.frames - 1 }),
       });
     }
-    // 발사 지점 머즐 플래시
-    this.spark(W - 150, 470, color);
-    const p = this.add.sprite(W - 160, 470, key).setDepth(60).play(key);
-    p.setFlipX(true); // 아트는 오른쪽 진행 기준 → 좌측(상대)로 향하게 뒤집기
+    const fromX = incoming ? 160 : W - 160;   // 상대(좌) 또는 나(우)에서 출발
+    const toX   = incoming ? W - 150 : 150;    // 반대편 캐릭터로
+    const target = incoming ? this.meSprite : this.oppSprite;
+    this.spark(fromX, 470, color); // 발사 지점 머즐 플래시
+    const p = this.add.sprite(fromX, 470, key).setDepth(60).play(key);
+    p.setFlipX(!incoming); // 아트는 오른쪽 진행 기준 → 좌향 공격만 뒤집기
     p.setScale(300 / fx.fh); // 프레임 높이를 ~300px로 (크게)
     this.tweens.add({
-      targets: p, x: 150, duration: 1200, ease: 'Sine.inOut',
-      onComplete: () => { p.destroy(); this.shakeSprite(this.oppSprite); }, // 착탄: 캐릭터 흔들림
+      targets: p, x: toX, duration: 1200, ease: 'Sine.inOut',
+      onComplete: () => { p.destroy(); this.shakeSprite(target); }, // 착탄: 캐릭터 흔들림
     });
   }
 
@@ -455,11 +463,6 @@ export default class BattleScene extends Phaser.Scene {
     this.spark(x, y, color);
     const ring = this.add.image(x, y, 'ring').setTint(color).setScale(0.2).setAlpha(0.9).setBlendMode('ADD');
     this.tweens.add({ targets: ring, scale: 2.4, alpha: 0, duration: 520, onComplete: () => ring.destroy() });
-  }
-
-  flashRed() {
-    const r = this.add.rectangle(W / 2, H / 2, W, H, 0xff0000, 0.35);
-    this.tweens.add({ targets: r, alpha: 0, duration: 350, onComplete: () => r.destroy() });
   }
 }
 
