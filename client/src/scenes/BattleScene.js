@@ -176,12 +176,6 @@ export default class BattleScene extends Phaser.Scene {
     this.cd.add([cdBg, this.cdNum]);
     this.subText = this.add.text(W / 2, 585, '', { fontSize: '20px', fontStyle: 'bold', color: CSS.sun }).setOrigin(0.5);
 
-    // 통나무
-    const log = this.add.graphics();
-    log.fillStyle(C.wood, 1).fillRoundedRect(W / 2 - 150, 630, 300, 34, 17);
-    log.lineStyle(3, C.woodDark, 1).strokeRoundedRect(W / 2 - 150, 630, 300, 34, 17);
-    log.lineStyle(3, C.woodDark, 0.6).strokeCircle(W / 2 - 150, 647, 12);
-
     // 배너 (술법/피격)
     this.banner = this.add.text(W / 2, 230, '', { fontSize: '44px', fontStyle: 'bold', color: '#fff' }).setOrigin(0.5).setDepth(50);
 
@@ -197,7 +191,7 @@ export default class BattleScene extends Phaser.Scene {
 
   drawFighters() {
     const cy = 470;
-    // 내 캐릭터 = 왼쪽, 상대 = 오른쪽 (피격 흔들림용으로 보관)
+    // 내 캐릭터 = 왼쪽, 상대 = 오른쪽 (HP 패널과 같은 편·피격 흔들림용으로 보관)
     this.meSprite = this.add.image(ME_X, cy, spriteKey(this.meChar.id));
     fit(this.meSprite, 200, 300);
     pill(this, ME_X, cy + 150, '나', { fill: 0x2a3a2b, border: C.orange, textColor: CSS.orange, bold: true });
@@ -387,28 +381,34 @@ export default class BattleScene extends Phaser.Scene {
     this.banner.setText(iWon ? '술법 발동!' : '피격!').setColor(iWon ? CSS.win : '#ff9a9a');
     this.time.delayedCall(900, () => this.banner.setText(''));
     this.cameras.main.shake(220, iWon ? 0.003 : 0.008);
-    // 내 캐릭터=좌, 상대=우. 승리 시 상대(우)에 술법, 패배 시 내(좌) 피격.
+    // 내 캐릭터=좌, 상대=우. 이기면 상대(우)로 발사, 지면 상대(우)→나(좌)로 술법이 날아와 내가 맞는다.
     if (iWon) {
-      // 완성한 인술의 속성 이펙트를 상대에게 발사 (착탄 시 상대가 흔들림)
-      if (this.currentJutsu) this.fireAttack(this.currentJutsu.element);
+      // 이김: 완성한 인술 속성을 상대에게 발사 (착탄 시 상대가 흔들림)
+      if (this.currentJutsu) this.fireAttack(this.currentJutsu.element, false);
       else this.shakeSprite(this.oppSprite);
-    } else { this.shakeSprite(this.meSprite); this.flashRed(); }
+    } else {
+      // 짐: 같은 인술이 상대→나로 날아와 나를 때린다 (착탄 시 내 캐릭터 흔들림)
+      if (this.currentJutsu) this.fireAttack(this.currentJutsu.element, true);
+      else this.shakeSprite(this.meSprite);
+    }
   }
 
-  // 속성 공격 애니메이션을 내(좌) → 상대(우)로 발사. 에셋 없으면 기존 링 이펙트로 폴백.
-  fireAttack(element) {
+  // 속성 공격 애니메이션 발사. incoming=false: 내(좌)→상대(우) 공격 / true: 상대(우)→나(좌) 피격.
+  // 에셋 없으면 대상 캐릭터 흔들림으로 폴백.
+  fireAttack(element, incoming = false) {
+    const target = incoming ? this.meSprite : this.oppSprite;
     const fx = FX[element];
-    if (!fx) return this.jutsu(OPP_X, 470, FX_COLOR[element] ?? C.win);
+    if (!fx) return this.shakeSprite(target);
     const key = `fx-${element}`;
-    const run = () => this.launchProjectile(key, element);
+    const run = () => this.launchProjectile(key, element, incoming);
     if (this.textures.exists(key)) return run();
     this.load.spritesheet(key, encodeURI(`/effects/${fx.file}`), { frameWidth: fx.fw, frameHeight: fx.fh });
     this.load.once('complete', () => { if (this.scene.isActive()) run(); });
-    this.load.once('loaderror', () => { if (this.scene.isActive()) this.jutsu(OPP_X, 470, FX_COLOR[element] ?? C.win); });
+    this.load.once('loaderror', () => { if (this.scene.isActive()) this.shakeSprite(target); });
     this.load.start();
   }
 
-  launchProjectile(key, element) {
+  launchProjectile(key, element, incoming = false) {
     const fx = FX[element], color = FX_COLOR[element] ?? C.win;
     if (!this.anims.exists(key)) {
       this.anims.create({
@@ -416,14 +416,17 @@ export default class BattleScene extends Phaser.Scene {
         frames: this.anims.generateFrameNumbers(key, { start: 0, end: fx.frames - 1 }),
       });
     }
-    // 발사 지점 머즐 플래시
-    this.spark(FIRE_FROM, 470, color);
-    const p = this.add.sprite(FIRE_FROM, 470, key).setDepth(60).play(key);
-    // 아트가 오른쪽 진행 기준이라 우측(상대)으로 갈 땐 뒤집지 않는다
+    // 나=좌, 상대=우. incoming=false: 나(FIRE_FROM)→상대(FIRE_TO) / true: 상대→나
+    const fromX = incoming ? FIRE_TO : FIRE_FROM;
+    const toX   = incoming ? FIRE_FROM : FIRE_TO;
+    const target = incoming ? this.meSprite : this.oppSprite;
+    this.spark(fromX, 470, color); // 발사 지점 머즐 플래시
+    const p = this.add.sprite(fromX, 470, key).setDepth(60).play(key);
+    p.setFlipX(incoming); // 아트는 오른쪽 진행 기준 → 좌향(나에게 날아오는 피격)일 때만 뒤집기
     p.setScale(300 / fx.fh); // 프레임 높이를 ~300px로 (크게)
     this.tweens.add({
-      targets: p, x: FIRE_TO, duration: 1200, ease: 'Sine.inOut',
-      onComplete: () => { p.destroy(); this.shakeSprite(this.oppSprite); }, // 착탄: 캐릭터 흔들림
+      targets: p, x: toX, duration: 1200, ease: 'Sine.inOut',
+      onComplete: () => { p.destroy(); this.shakeSprite(target); }, // 착탄: 캐릭터 흔들림
     });
   }
 
@@ -475,11 +478,6 @@ export default class BattleScene extends Phaser.Scene {
     this.spark(x, y, color);
     const ring = this.add.image(x, y, 'ring').setTint(color).setScale(0.2).setAlpha(0.9).setBlendMode('ADD');
     this.tweens.add({ targets: ring, scale: 2.4, alpha: 0, duration: 520, onComplete: () => ring.destroy() });
-  }
-
-  flashRed() {
-    const r = this.add.rectangle(W / 2, H / 2, W, H, 0xff0000, 0.35);
-    this.tweens.add({ targets: r, alpha: 0, duration: 350, onComplete: () => r.destroy() });
   }
 }
 
