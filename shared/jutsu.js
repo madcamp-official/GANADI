@@ -1,5 +1,8 @@
 // 인술 DB (서버·클라 공유). 라운드마다 하나를 뽑아 인의 순서를 목표 시퀀스로 쓴다.
 // client/src/data/jutsu.json과 같은 내용 — 게임 런타임은 이 파일을 단일 출처로 본다.
+// (json 쪽은 설명·영문명이 더 붙은 자료용 사본이다. 인 순서를 고칠 땐 양쪽을 같이 고칠 것.)
+
+import { RULES, PLAYABLE_SEAL_IDS } from './constants.js';
 
 export const JUTSU = [
   { id: 'great-fireball-jutsu', name_kr: '화둔·호화구의 술', element: 'FIRE', seals: ['SNAKE', 'RAM', 'MONKEY', 'BOAR', 'HORSE', 'TIGER'] },
@@ -24,11 +27,17 @@ export const SEAL_ID = {
 export const jutsuSeals = (j) => j.seals.map((s) => SEAL_ID[s]);
 
 // 실전 가능한(모든 인이 playable에 든) 인술 중 랜덤 하나. 없으면 전체에서.
-export function pickJutsu(playable) {
+// 기본값을 여기 둬서 서버 심판과 클라 연습 모드가 같은 목록을 보게 한다.
+export function pickJutsu(playable = PLAYABLE_SEAL_IDS) {
   const ok = JUTSU.filter((j) => jutsuSeals(j).every((id) => playable.includes(id)));
   const pool = ok.length ? ok : JUTSU;
   return pool[Math.floor(Math.random() * pool.length)];
 }
 
 // 시퀀스 길이(=인 개수)에 비례하는 데미지. 서버·클라가 같은 값을 봐야 한다.
-export const damageFor = (len) => len * 8;
+// 계수는 RULES.DAMAGE_PER_SEAL 하나만 본다 (매치 길이 조절 손잡이).
+export const damageFor = (len) => len * RULES.DAMAGE_PER_SEAL;
+
+// 시퀀스를 정직하게 맺었을 때의 물리적 최소 소요시간(ms). 이보다 빠른 완성 신고는 조작이다.
+export const minCompleteMs = (len) =>
+  len * RULES.SEAL_HOLD_MS * RULES.MIN_COMPLETE_RATIO;
