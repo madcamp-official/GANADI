@@ -7,14 +7,18 @@ import { RULES, PLAYABLE_SEAL_IDS } from './constants.js';
 export const JUTSU = [
   { id: 'great-fireball-jutsu', name_kr: '화둔·호화구의 술', element: 'FIRE', seals: ['SNAKE', 'RAM', 'MONKEY', 'BOAR', 'HORSE', 'TIGER'] },
   { id: 'phoenix-sage-fire-jutsu', name_kr: '화둔·봉선화의 술', element: 'FIRE', seals: ['RAT', 'TIGER', 'DOG', 'OX', 'RABBIT'] },
+  { id: 'dragon-fire-technique', name_kr: '화둔·호룡화의 술', element: 'FIRE', seals: ['TIGER', 'ROOSTER', 'DRAGON', 'DOG'] },
   { id: 'water-dragon-bullet-jutsu', name_kr: '수둔·수룡탄의 술', element: 'WATER', seals: ['OX', 'MONKEY', 'RABBIT', 'RAT', 'BOAR', 'TIGER', 'SNAKE'] },
   { id: 'water-shark-bomb-jutsu', name_kr: '수둔·수상어탄의 술', element: 'WATER', seals: ['TIGER', 'OX', 'BOAR', 'DRAGON'] },
   { id: 'earth-style-wall', name_kr: '토둔·토류벽', element: 'EARTH', seals: ['BOAR', 'HORSE', 'DOG'] },
   { id: 'earth-head-hunter-jutsu', name_kr: '토둔·이중식파의 술', element: 'EARTH', seals: ['SNAKE', 'RAM', 'BOAR', 'DRAGON'] },
+  { id: 'earth-style-mud-spikes', name_kr: '토둔·토류창', element: 'EARTH', seals: ['ROOSTER', 'MONKEY', 'DRAGON', 'BOAR'] },
   { id: 'wind-great-breakthrough', name_kr: '풍둔·대돌파', element: 'WIND', seals: ['RABBIT', 'RAT', 'DOG'] },
   { id: 'wind-vacuum-sphere', name_kr: '풍둔·진공옥', element: 'WIND', seals: ['DRAGON', 'RABBIT', 'TIGER', 'DOG'] },
+  { id: 'wind-style-gale-palm', name_kr: '풍둔·열풍장', element: 'WIND', seals: ['SNAKE', 'ROOSTER', 'RAM'] },
   { id: 'chidori', name_kr: '뇌둔·치도리', element: 'LIGHTNING', seals: ['OX', 'RABBIT', 'MONKEY', 'DRAGON', 'RAT'] },
   { id: 'lightning-false-darkness', name_kr: '뇌둔·거짓 어둠', element: 'LIGHTNING', seals: ['MONKEY', 'DRAGON', 'RAT', 'OX'] },
+  { id: 'lightning-beast-tracking-fang', name_kr: '뇌둔·뇌수추적의 술', element: 'LIGHTNING', seals: ['DOG', 'ROOSTER', 'TIGER'] },
 ];
 
 // 인술 DB의 12지신 영문명 → 우리 seal id (RAM=goat, BOAR=pig 주의)
