@@ -10,6 +10,11 @@ Day1_A.md
 Day2_A.md
 Day2.md
 Day3_A.md
+# MediaPipe self-host 자산 (합계 ~40MB). `npm run vendor:mediapipe`로 언제든 재생성된다.
+# 없으면 handLandmarker.js가 CDN으로 폴백하므로 클론 직후에도 게임은 뜬다.
+client/public/mediapipe/
+client/public/model/hand-landmarker/
+
 # 수집된 학습 데이터 / 모델 (용량 큼 — 별도 관리)
 # ★ 반드시 선행 슬래시 — 없으면 client/src/data/ 등 하위 data 폴더까지 통째로 무시된다
 /data/
