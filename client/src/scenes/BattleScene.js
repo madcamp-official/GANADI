@@ -24,6 +24,17 @@ const NEXT_ROUND_DELAY_MS = 2000;    // referee.js와 같은 간격
 // 캐릭터·웹캠·발사체 방향이 전부 이 상수를 따르므로 진영을 바꾸려면 여기만 뒤집으면 된다.
 const ME_X = 110, OPP_X = W - 110;
 const FIRE_FROM = ME_X + 50, FIRE_TO = OPP_X - 40; // 발사체 시작/착탄 x
+// 캐릭터 세로 중심. 웹캠도 이 값을 기준으로 배치하므로 캐릭터를 옮기면 캠이 따라온다.
+const FIGHTER_CY = 470;
+const FIGHTER_HALF_W = 100; // fit(spr, 200, 300)의 최대 반폭 — 캠을 이 바깥에 둬야 안 겹친다
+
+// 웹캠 — 각 캐릭터 "바로 옆"(안쪽)에, 무엇과도 겹치지 않는 자리.
+// 세로 484~596 구간이 비어 있다: 위로는 인식 게이지 글자(~481), 아래로는 나/상대 라벨(603~).
+// 가로는 캐릭터 반폭 + 여백만큼 안쪽으로 밀어 스프라이트를 피한다.
+const CAM_W = 140, CAM_H = 105;
+const CAM_CY = 540;
+const CAM_GAP = 0; // 캐릭터와 캠 사이 여백
+const CAM_DX = FIGHTER_HALF_W + CAM_GAP + CAM_W / 2; // 캐릭터 중심 → 캠 중심 거리
 
 // HP 패널 — 좌(나)/우(상대)를 같은 크기로, 화면 중앙 기준 대칭 배치.
 // 텍스트·바 좌표를 전부 아래 값에서 유도하므로 한쪽만 어긋날 일이 없다.
@@ -190,7 +201,7 @@ export default class BattleScene extends Phaser.Scene {
   }
 
   drawFighters() {
-    const cy = 470;
+    const cy = FIGHTER_CY;
     // 내 캐릭터 = 왼쪽, 상대 = 오른쪽 (HP 패널과 같은 편·피격 흔들림용으로 보관)
     this.meSprite = this.add.image(ME_X, cy, spriteKey(this.meChar.id));
     fit(this.meSprite, 200, 300);
@@ -215,18 +226,19 @@ export default class BattleScene extends Phaser.Scene {
   positionCams() {
     const rect = this.game.canvas.getBoundingClientRect();
     const sx = rect.width / W, sy = rect.height / H;
-    const camW = 150, camH = 112, topY = 205;
+    // 캐릭터 바로 옆(안쪽)에 나란히. 캐릭터·인장 타일·라벨 어디와도 겹치지 않는다.
+    const topY = CAM_CY - CAM_H / 2;
     const place = (el, worldCx) => {
       if (!el) return;
       el.style.position = 'fixed';
-      el.style.left = `${rect.left + (worldCx - camW / 2) * sx}px`;
+      el.style.left = `${rect.left + (worldCx - CAM_W / 2) * sx}px`;
       el.style.top = `${rect.top + topY * sy}px`;
-      el.style.width = `${camW * sx}px`;
-      el.style.height = `${camH * sy}px`;
+      el.style.width = `${CAM_W * sx}px`;
+      el.style.height = `${CAM_H * sy}px`;
       el.style.zIndex = '10';
     };
-    place(this.localCam, ME_X);                    // 내 캐릭터 (좌)
-    if (!this.practice) place(this.remoteCam, OPP_X); // 상대 캐릭터 (우)
+    place(this.localCam, ME_X + CAM_DX);                    // 내 캐릭터(좌)의 오른쪽 옆
+    if (!this.practice) place(this.remoteCam, OPP_X - CAM_DX); // 상대 캐릭터(우)의 왼쪽 옆
   }
 
   restoreCams() {
