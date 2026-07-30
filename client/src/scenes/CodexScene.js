@@ -15,6 +15,20 @@ const SHOW_BADGE = PLAYABLE_SEAL_IDS.length < SEAL_IDS.length;
 const BOARD_FILE = { rat: 'mouse', rooster: 'bird' };
 const boardFile = (id) => BOARD_FILE[id] ?? id;
 
+/**
+ * 손동작 자료 후보 — 앞에서부터 시도하고, 파일이 없으면 다음으로 넘어간다.
+ * 움직이는 시범(gif)이 있으면 그걸 쓰고, 없는 인장은 기존 사진(jpg)으로 폴백한다.
+ * gif 파일명이 seal id인지 board 매핑명(mouse·bird)인지 확정되지 않아 둘 다 시도한다.
+ */
+const mediaSources = (id) => [
+  `/gif/${id}.gif`,
+  `/gif/${boardFile(id)}.gif`,
+  `/board/${boardFile(id)}.jpg`,
+];
+
+// 팝업 안 자료 박스. object-fit:contain — gif/jpg 비율이 달라도 찌그러지지 않는다.
+const styMedia = 'width:440px;height:400px;object-fit:contain;display:block;';
+
 export default class CodexScene extends Phaser.Scene {
   constructor() {
     super('Codex');
@@ -83,17 +97,12 @@ export default class CodexScene extends Phaser.Scene {
     void hex;
   }
 
-  // 손동작 이미지를 필요할 때 로드해서 팝업으로 표시
+  // 손동작 자료를 팝업으로 표시 (로드는 DOM <img>가 알아서 한다)
   showGesture(seal) {
-    const key = `board-${seal.id}`;
-    if (this.textures.exists(key)) return this.openModal(seal, key);
-    this.load.image(key, `/board/${boardFile(seal.id)}.jpg`);
-    this.load.once('complete', () => { if (this.scene.isActive()) this.openModal(seal, key); });
-    this.load.once('loaderror', () => console.warn('[codex] 손동작 이미지 로드 실패:', seal.id));
-    this.load.start();
+    this.openModal(seal);
   }
 
-  openModal(seal, key) {
+  openModal(seal) {
     this.closeModal();
     const cw = GAME.WIDTH, ch = GAME.HEIGHT;
     const bg = this.add.rectangle(cw / 2, ch / 2, cw, ch, 0x120f08, 0.78).setDepth(200)
@@ -110,14 +119,38 @@ export default class CodexScene extends Phaser.Scene {
     const startX = cw / 2 - (kanji.width + gap + name.width) / 2;
     kanji.x = startX;
     name.x = startX + kanji.width + gap;
-    const img = this.add.image(cw / 2, ch / 2 + 20, key).setDepth(202);
-    img.setScale(Math.min(440 / img.width, 400 / img.height));
+    // ★ Phaser 텍스처가 아니라 DOM <img>로 띄운다 — load.image는 gif의 첫 프레임만 구워서
+    //   움직이지 않는다. DOM에 맡기면 브라우저가 알아서 애니메이션을 재생한다.
+    const media = this.add.dom(cw / 2, ch / 2 + 20).createFromHTML(`<img style="${styMedia}" />`);
+    media.setDepth(202);
+    const el = media.node.querySelector('img');
+    this.loadMedia(el, seal.id);
+    // DOM은 캔버스 위에 떠 있어 bg의 pointerdown이 안 닿는다 — 자료 위 클릭도 닫히게 직접 건다
+    el.style.cursor = 'pointer';
+    el.onclick = () => this.closeModal();
+
     const hint = this.add.text(cw / 2, ch / 2 + 262, '아무 곳이나 눌러 닫기', {
       fontSize: '15px', color: '#8A6B4A',
     }).setOrigin(0.5).setDepth(202);
 
-    this.modalObjs = [bg, pg, kanji, name, img, hint];
+    this.modalObjs = [bg, pg, kanji, name, media, hint];
     bg.on('pointerdown', () => this.closeModal());
+  }
+
+  // 후보 경로를 순서대로 시도한다. 404면 onerror가 다음 후보로 넘긴다.
+  loadMedia(el, sealId) {
+    const sources = mediaSources(sealId);
+    let i = 0;
+    const tryNext = () => {
+      if (i >= sources.length) {
+        el.style.display = 'none'; // 자료가 아예 없는 인장 — 깨진 이미지 아이콘 대신 빈칸
+        console.warn('[codex] 손동작 자료 없음:', sealId);
+        return;
+      }
+      el.src = sources[i++];
+    };
+    el.onerror = tryNext;
+    tryNext();
   }
 
   closeModal() {
