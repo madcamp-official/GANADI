@@ -314,7 +314,7 @@ export default class BattleScene extends Phaser.Scene {
     pill(this, OPP_X, cy + 150, '상대', { fill: 0x2a3a2b, border: C.water, textColor: '#9fd0ff', bold: true });
   }
 
-  // 웹캠을 각 캐릭터 머리 위(월드 좌표)로 배치. 캔버스 화면 좌표로 변환.
+  // 웹캠을 각 캐릭터 바로 옆(월드 좌표)에 배치. 캔버스 화면 좌표로 변환.
   setupCams() {
     this.localCam = document.getElementById('local-cam');
     this.remoteCam = document.getElementById('remote-cam');

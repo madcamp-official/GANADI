@@ -3,13 +3,15 @@
 > **웹캠으로 진짜 손을 써서 12지신 인장(印)을 맺어 싸우는 1:1 실시간 대전 웹게임**
 > 몰입캠프 26s-w4-c1-05 · 2인 / 6일 프로젝트
 
+<!-- ⚠️ img/demo.gif 파일이 아직 없어 지금은 깨진 이미지로 보입니다.
+     시연 영상에서 5초(손 인장 → 술법 발동)를 잘라 img/demo.gif 로 넣어주세요. -->
 ![메인화면](img/demo.gif)
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Phaser-3.80-2E2E2E?logo=phaser" />
+  <img src="https://img.shields.io/badge/Phaser-3.90-2E2E2E?logo=phaser" />
   <img src="https://img.shields.io/badge/MediaPipe-Tasks%20Vision-00A3A3?logo=google" />
-  <img src="https://img.shields.io/badge/TensorFlow.js-4.20-FF6F00?logo=tensorflow" />
-  <img src="https://img.shields.io/badge/Socket.IO-4.7-010101?logo=socketdotio" />
+  <img src="https://img.shields.io/badge/TensorFlow.js-4.22-FF6F00?logo=tensorflow" />
+  <img src="https://img.shields.io/badge/Socket.IO-4.8-010101?logo=socketdotio" />
   <img src="https://img.shields.io/badge/PeerJS-WebRTC-5A29E4?logo=webrtc" />
   <img src="https://img.shields.io/badge/Node.js-Express-339933?logo=nodedotjs" />
 </p>
@@ -113,9 +115,10 @@
 
 - [x] **웹캠 손 인식** — MediaPipe Hand Landmarker로 두 손 42개 랜드마크 실시간 추출
 - [x] **십이지 인장 판별** — 182차원 쌍거리 특징 + 13클래스 소형 MLP (인장 12 + `none`)
-- [x] **인장 확정 로직** — 시간축 다수결(8프레임) → 0.4초 홀드 → 엣지 트리거 1회 발행
+- [x] **인장 확정 로직** — 시간축 다수결(270ms) → 0.4초 홀드 → 엣지 트리거 1회 발행
 - [x] **방 생성 / 4자리 코드 입장 / 2인 매칭**
 - [x] **서버 권위 라운드 심판** — 시퀀스 배포 → 수신 대기 → 판정 → 데미지 브로드캐스트 → 다음 라운드
+- [x] **라운드 제한시간 30초** — 아무도 못 끝내면 무승부로 다음 라운드. 인식이 미끄러져도 화면이 멈추지 않는다
 - [x] **HP 100 · 시퀀스 길이 비례 데미지** — 체력 0 시 매치 종료
 - [x] **캐릭터 선택 (4종)** — 스탯 동일, 스킨만 차이 (밸런싱 제거)
 - [x] **대전 UI** — 인장 타일 열, 좌우 대칭 HP 바, 카운트다운, 상대 진행률 실시간 표시
@@ -125,18 +128,21 @@
 
 - [x] **인술(忍術) 시스템** — 라운드마다 실제 인술 10종 중 하나를 추첨, 그 인술의 인 순서가 곧 목표 시퀀스
 - [x] **속성별 발사체 이펙트** — 불/물/땅/바람/번개 스프라이트시트. **패배 시엔 상대 술법이 나에게 날아와 피격**
-- [x] **P2P 화상 통화** — PeerJS. 각 캐릭터 머리 위에 웹캠 배치. 실패해도 게임은 무영향
+- [x] **P2P 화상 통화** — PeerJS. 각 캐릭터 바로 옆에 웹캠 배치. 실패해도 게임은 무영향
 - [x] **인장 도감** — 십이지 12종 카드 + 난이도 색상 + 클릭 시 실제 손동작 사진 팝업
 - [x] **손 인식 준비 관문(HandCheck)** — 두 손바닥 1초 유지로 카메라·인식기 상태 사전 검증
 - [x] **오프라인 연습 모드** — 서버·상대 없이 혼자 완주. 시연 중 서버가 죽어도 도는 안전망
+- [x] **MediaPipe 자산 self-host** — WASM·모델을 로컬에서 먼저 찾고 없으면 CDN 폴백. 시연장 네트워크에 인식을 걸지 않는다
 - [x] **인식 게이지** — "인식이 안 되는 것"과 "인식되는 중"을 구분해 보여주는 3상태 UI
 - [x] **데이터 수집·라벨링 툴** (`hand-test/collector.html`) — 인장 선택 → 스페이스바 → 30프레임 연사 → JSON/ZIP 내보내기
 - [x] **오프라인 평가 도구 체인** — 리플레이 · 혼동행렬 · 임계값 스윕 · 배포 아티팩트 스모크 테스트
-- [x] **이탈 시 몰수승 처리**
-- [x] **한글/한자 분리 웹폰트 서브셋** — 21MB → 116KB 경량화
+- [x] **서버 회귀 테스트** (`npm run test:server`) — 실제 서버를 띄우고 붙어서 방 관리·판정을 검증하는 26개 시나리오
+- [x] **이탈 시 몰수승 처리** · 대전 중 나가기
+- [x] **한글/한자 분리 웹폰트 서브셋** — 쓰는 글자만 남겨 8.7MB(ttf) → 114KB(woff2 2종)
 - [ ] 동시 커밋형 심리전 모드 (스트레치 — Day 6 게이트에서 컷)
-- [ ] 캘리브레이션 씬 (`CalibrationScene`은 골격만 존재, 씬 흐름 미연결)
-- [ ] 재접속 복구 (스코프 아웃)
+- [ ] 캘리브레이션 씬 (기획엔 있었으나 미구현 — 골격만 있던 `CalibrationScene`은 이후 제거)
+- [ ] 재접속 복구 (스코프 아웃 — 소켓 id가 바뀌면 서버가 방을 정리한다)
+- [ ] 사운드 (인장 확정 · 술법 발동 · 승패 BGM)
 
 ---
 
@@ -149,7 +155,8 @@
         │       │                            │                                  │
         │       │                            ▼                                  │
         │       │            ┌───────── handTracker (앱 전역 싱글턴) ─────────┐  │
-        │       │            │  rAF 루프 · 같은 프레임 중복 추론 방지         │  │
+        │       │            │  rAF 루프 · 중복 추론 방지 · 30fps 상한        │  │
+        │       │            │  (인식 불필요 씬에선 루프 정지)                │  │
         │       │            │      │                                         │  │
         │       │            │      ▼                                         │  │
         │       │            │  MediaPipe HandLandmarker (WASM / GPU)         │  │
@@ -161,7 +168,7 @@
         │       │            │  MLP (TF.js, 13-way softmax)                   │  │
         │       │            │      │  ACCEPT 0.80 / MARGIN 0.20              │  │
         │       │            │      ▼                                         │  │
-        │       │            │  다수결(8f) → 홀드(400ms) → 엣지 트리거        │  │
+        │       │            │  다수결(270ms) → 홀드(400ms) → 엣지 트리거     │  │
         │       │            └──────┬──────────────────────────┬─────────────-┘  │
         │       │        onSeal(id, conf, ts)          onFrame(state)            │
         │       │                   ▼                          ▼                 │
@@ -172,16 +179,18 @@
         └───────┼───────────────────┼────────────────────────────────────────────┘
                 │                   │
     ┌───────────┘                   │  Socket.IO (WSS)
-    │  MediaStream                  │   ▲ round:start / round:result / match:over
+    │  MediaStream                  │   ▲ round:start / result / timeout / match:over
     │                               ▼   │ round:complete / round:oppProgress
     │                    ┌─────────────────────────────────┐
     │                    │    NODE SERVER (Express + SIO)  │
     │                    │                                 │
     │                    │  rooms.js    방 Map · 코드 매칭   │
+    │                    │  한 소켓 = 한 방 (불변식)         │
     │                    │      │                          │
     │                    │      ▼                          │
     │                    │  referee.js  라운드 상태 머신     │
     │                    │  대기→배포→수신→판정→브로드캐스트  │
+    │                    │  30초 제한시간 · 완성 시간 검증    │
     │                    │      ▲                          │
     │                    │      │ shared/jutsu.js (인술 DB) │
     │                    │  peer:id 중계 (영상은 안 지나감)  │
@@ -219,22 +228,28 @@
 ```
  Player A            Server (referee)              Player B
     │                      │                          │
-    │      round:start { round, sequence, jutsu }      │
+    │  round:start { round, sequence, jutsu, timeLimitMs }
     │ <────────────────────┼────────────────────────> │
-    │                      │                          │
+    │                      │  ⏱ 30초 타이머 시작       │
  [손으로 인 맺기]           │                   [손으로 인 맺기]
     │  round:oppProgress   │   round:oppProgress      │
     │ ────────────────────>│─────────────────────────>│  (중계만, 판정 무관)
     │                      │                          │
     │  round:complete ────>│  ← 서버 수신 순서 = 승부   │
-    │                      │  roundResolved = true    │
-    │                      │  hp[loser] -= len × 8    │
+    │                      │  ① 너무 빠르면 버림        │
+    │                      │    (len × 400ms × 0.5 미만)│
+    │                      │  ② roundResolved = true   │
+    │                      │  ③ hp[loser] -= len × 8   │
     │  round:result { winner, damage, hp }             │
     │ <────────────────────┼─────────────────────────>│
     │                      │                          │
     │                 hp <= 0 ?                       │
     │        ├─ yes → match:over { winner }           │
     │        └─ no  → 2초 후 startRound()             │
+    │                      │                          │
+    │   ⏱ 30초 안에 아무도 완성 못 하면                  │
+    │  round:timeout { round, hp }  ← 데미지 없이 다음   │
+    │ <────────────────────┼─────────────────────────>│
 ```
 
 ---
@@ -245,20 +260,20 @@
 
 | 역할 | 기술 | 비고 |
 | --- | --- | --- |
-| 게임 엔진 | **Phaser 3.80** | 8개 씬, 트윈 · 파티클 · 스프라이트시트 애니메이션 |
-| 번들러 | **Vite 5** | LAN 노출(`host: true`)로 실기기 대전 테스트 |
-| 손 추적 | **@mediapipe/tasks-vision 0.10** | Hand Landmarker, `numHands: 2`, GPU delegate, VIDEO 모드 |
-| 추론 | **TensorFlow.js 4.20** | 13-way MLP를 브라우저에서 로드 · 추론 |
+| 게임 엔진 | **Phaser 3.90** | 7개 씬, 트윈 · 파티클 · 스프라이트시트 애니메이션 |
+| 번들러 | **Vite 5.4** | LAN 노출(`host: true`)로 실기기 대전 테스트 |
+| 손 추적 | **@mediapipe/tasks-vision 0.10** | Hand Landmarker, `numHands: 2`, GPU delegate, VIDEO 모드. WASM·모델은 로컬 우선 · CDN 폴백 |
+| 추론 | **TensorFlow.js 4.22** | `tfjs-core` + `tfjs-layers` + `tfjs-backend-webgl`만 임포트. 메타패키지를 쓰면 안 쓰는 조각까지 딸려와 번들이 350KB 커진다 |
 | 화상 | **PeerJS 1.5 (WebRTC)** | glare 방지: 입장한 쪽만 `call`, 만든 쪽은 `answer` |
-| 통신 | **socket.io-client 4.7** | 단일 소켓 인스턴스 공유 |
+| 통신 | **socket.io-client 4.8** | 단일 소켓 인스턴스 공유 |
 | 렌더링 | Canvas 2560×1440 (`RENDER_SCALE 2`) → FIT 다운스케일 | 좌표계는 1280×720 유지, 텍스트 선명도 확보 |
 
 ### Backend
 
 | 역할 | 기술 | 비고 |
 | --- | --- | --- |
-| HTTP | **Express 4** | `/health` 헬스체크 하나 (게임 로직은 전부 소켓) |
-| 실시간 | **Socket.IO 4.7** | 방 · 매칭 · 심판 · 시그널링 중계 |
+| HTTP | **Express 4.22** | `/health` 헬스체크 하나 (게임 로직은 전부 소켓) |
+| 실시간 | **Socket.IO 4.8** | 방 · 매칭 · 심판 · 시그널링 중계. CORS는 `CORS_ORIGIN`으로 제한 |
 | 런타임 | **Node.js (ESM)** | `node --watch`로 개발, 무상태 인메모리 |
 
 ### Data / ML
@@ -274,9 +289,10 @@
 
 | 역할 | 기술 |
 | --- | --- |
-| 모노레포 | npm workspaces (`client` / `server`) |
-| 배포 | 클라이언트 Vercel/Netlify · 서버 Render/Fly.io |
+| 모노레포 | npm workspaces (`client` / `server`) + 공유 `shared/` |
+| 배포 | **Cloudflare Tunnel** — `narudo.madcamp-kaist.org` (클라) · `api.narudo.madcamp-kaist.org` (서버) |
 | 필수 조건 | **HTTPS** (`getUserMedia` 제약 — localhost 예외) |
+| 테스트 | `npm run test:server` — 실제 서버를 띄워 붙는 회귀 시나리오 26개 |
 
 ---
 
@@ -307,7 +323,7 @@
 | **쌍거리 특징** | 원시 좌표 대신 랜드마크 쌍의 거리 행렬 → 맞물림 구조를 훨씬 잘 인코딩. 위치 · 스케일 불변 |
 | **손목 기준 정규화** | 손이 화면 어디에 있든, 카메라에서 얼마나 멀든 같은 포즈면 같은 값 |
 | **PIP 관절 추가 (v1→v2)** | 교차 세션 정확도 **60.7% → 69.1%** (5회 평균, 분포 겹침 없음). DIP까지 넣으면 오히려 하락 |
-| **시간축 다수결 (8프레임)** | 단발 오인식 소멸 |
+| **시간축 다수결 (270ms)** | 단발 오인식 소멸. 프레임 수가 아니라 ms로 정의해 추론 fps를 바꿔도 체감 반응이 그대로다 |
 | **0.4초 홀드 + 엣지 트리거** | 같은 홀드에서 두 번 발행되는 것 방지 |
 | **홀드 구간 최고 confidence 채택** | 확정 순간의 프레임이 하필 거부된 프레임일 때 "confidence 0"이 발행되는 거짓 신호 제거 |
 | **손 개수별 센트로이드 분리** | 한 인장 안에 1손/2손이 섞이면 평균이 어느 무리에도 속하지 않는 허공의 점이 됨 (호랑이가 실제로 붕괴) |
@@ -351,9 +367,12 @@ GANADI/
 │   ├── vite.config.js                   # LAN 노출 · 터널 도메인 허용
 │   ├── public/
 │   │   ├── model/seal-mlp/              # ★ 배포 모델 (model.json · weights.bin · labels.json)
+│   │   ├── model/hand-landmarker/       # MediaPipe 모델 self-host (gitignore · vendor 스크립트로 생성)
+│   │   ├── mediapipe/wasm/              # MediaPipe WASM self-host (gitignore · 동상)
 │   │   ├── characters/                  # 가나디 캐릭터 스프라이트 4종
 │   │   ├── effects/                     # 속성별 발사체 스프라이트시트
 │   │   ├── board/                       # 인장 손동작 사진 (도감 팝업)
+│   │   ├── gif/                         # 인장 손동작 gif (gitignore — 용량 큼, board가 폴백)
 │   │   └── fonts/                       # 한글/한자 분리 서브셋 woff2
 │   └── src/
 │       ├── main.js                      # Phaser 부트스트랩 (폰트 로드 후 시작)
@@ -365,11 +384,10 @@ GANADI/
 │       │   ├── LobbyScene.js            # 방 생성 / 코드 입장 / 연습 모드
 │       │   ├── BattleScene.js           # 대전 본체 (온라인 + 연습 겸용)
 │       │   ├── ResultScene.js           # 승패 연출
-│       │   ├── CodexScene.js            # 인장 도감 (12종 + 손동작 팝업)
-│       │   └── CalibrationScene.js      # (골격만 — 씬 흐름 미연결)
+│       │   └── CodexScene.js            # 인장 도감 (12종 + 손동작 팝업)
 │       ├── recognition/
-│       │   ├── handTracker.js           # ★ rAF 프레임 루프 · 앱 전역 싱글턴
-│       │   ├── handLandmarker.js        # MediaPipe 래퍼
+│       │   ├── handTracker.js           # ★ rAF 프레임 루프 · 앱 전역 싱글턴 · fps 상한 · pause/resume
+│       │   ├── handLandmarker.js        # MediaPipe 래퍼 (로컬 자산 우선 · CDN 폴백)
 │       │   ├── recognizer.js            # ★ onSeal 계약 · 다수결 · 홀드 · 엣지 트리거
 │       │   ├── features.js              # 특징 v1 (90차원) — 센트로이드용
 │       │   ├── featuresV2.js            # 특징 v2 (182차원) — MLP용
@@ -385,29 +403,28 @@ GANADI/
 │       ├── data/
 │       │   ├── seals.js                 # 십이지 정의 (한자 · 난이도)
 │       │   ├── characters.js            # 캐릭터 4종
-│       │   ├── jutsu.json               # 인술 DB
-│       │   └── labelingTool.js          # 수집 세션 헬퍼
+│       │   └── jutsu.json               # 인술 DB (자료용 사본 — 런타임은 shared/jutsu.js)
 │       └── devtools/recognizerTest.js   # 브라우저 인식기 테스트 하네스
 │
 ├── server/                              # Node + Express + Socket.IO
 │   └── src/
-│       ├── index.js                     # 진입점 (HTTP + Socket.IO)
-│       ├── rooms.js                     # 방 생성/입장/매칭/이탈 처리
-│       ├── referee.js                   # ★ 라운드 상태 머신 (서버 권위 판정)
-│       └── sequence.js                  # shared/sequence.js 재수출
+│       ├── index.js                     # 진입점 (HTTP + Socket.IO · CORS)
+│       ├── rooms.js                     # ★ 방 생성/입장/매칭/이탈 — "한 소켓 = 한 방" 불변식
+│       └── referee.js                   # ★ 라운드 상태 머신 (서버 권위 판정 · 제한시간 · 치트 가드)
 │
 ├── shared/                              # ★ 클라 · 서버 공유 SSOT
 │   ├── constants.js                     # seal id · 소켓 이벤트명 · 룰 상수
-│   ├── jutsu.js                         # 인술 DB · 데미지 계산
-│   └── sequence.js                      # 시퀀스 생성 (연속 중복 금지)
+│   └── jutsu.js                         # 인술 DB · 데미지 · 최소 완성시간 계산
 │
-├── tools/                               # 오프라인 학습 · 평가 (Node 스크립트)
+├── tools/                               # 오프라인 학습 · 평가 · 운영 (Node 스크립트)
 │   ├── trainMLP.mjs                     # ★ 학습 + 홀드아웃 채점 + 붕괴 필터
 │   ├── makeCentroids.mjs                # 센트로이드 생성
 │   ├── replay.mjs                       # 저장 데이터 리플레이 채점 · 임계값 스윕
 │   ├── mlpEval.mjs                      # 교차 세션 실험
 │   ├── imageEval.mjs                    # 픽셀 CNN 비교 실험
 │   ├── smokeMLP.mjs                     # 배포 아티팩트 스모크 테스트
+│   ├── testServer.mjs                   # ★ 서버 회귀 테스트 26개 (방 관리 · 판정 · 보안)
+│   ├── vendorMediapipe.mjs              # MediaPipe WASM·모델 로컬 내려받기 (오프라인 시연용)
 │   └── lib/                             # sessions · augment · handCrop
 │
 ├── hand-test/                           # 데이터 수집 · 라벨링 툴 (독립 페이지)
@@ -437,11 +454,20 @@ GANADI/
 VITE_SERVER_URL=http://localhost:3001
 ```
 
+> ⚠️ **`VITE_SERVER_URL`은 런타임이 아니라 빌드 타임에 번들로 구워집니다.** 빌드한 뒤에는 못 바꿉니다.
+> 배포용 빌드는 반드시 값을 준 채로 돌리세요 — 안 그러면 `localhost:3001`이 박힌 채로 배포됩니다.
+> ```bash
+> VITE_SERVER_URL=https://api.narudo.madcamp-kaist.org npm run build:client
+> ```
+
 **`server/.env`**
 
 ```bash
 # 서버 포트 (미설정 시 3001)
 PORT=3001
+
+# CORS 허용 오리진 (콤마 구분). 미설정 시 전체 허용(*) + 시작 로그에 경고
+CORS_ORIGIN=https://narudo.madcamp-kaist.org
 ```
 
 ### 실행
@@ -456,9 +482,24 @@ npm run dev:server
 # 3. 클라이언트 실행 → http://localhost:5173
 npm run dev:client
 
-# 4. 프로덕션 빌드
+# 4. 프로덕션 빌드 (서버 주소를 함께 주입 — 위 경고 참고)
 npm run build:client
+
+# 5. 서버 회귀 테스트 (방 관리·판정을 건드렸다면 반드시)
+npm run test:server
 ```
+
+### 시연 전 준비 — MediaPipe 자산 로컬화
+
+```bash
+npm run vendor:mediapipe
+```
+
+WASM 런타임(node_modules에서 복사)과 손 랜드마커 모델(약 7.5MB 다운로드)을 `client/public/` 아래에 받아둡니다.
+받아두면 **인터넷 없이도 손 인식이 뜹니다.** 브라우저 콘솔에서 `[landmarker] wasm=로컬 · 모델=로컬` 로 확인하세요.
+
+> 자산은 합계 약 40MB라 git에 넣지 않습니다(`.gitignore`). 없으면 자동으로 CDN 폴백하므로
+> 클론 직후에도 게임은 정상 동작하고, 다만 시연장 네트워크에 의존하게 됩니다.
 
 ### 데이터 수집 & 모델 재학습
 
@@ -510,11 +551,12 @@ Boot(웹캠 권한) → CharacterSelect(4종) → HandCheck(두 손바닥 1초)
 
 | 이벤트 | Payload | ACK | 설명 |
 | --- | --- | --- | --- |
-| `room:create` | `{ character: string }` | `{ code }` | 4자리 방 코드 생성 후 입장 |
-| `room:join` | `{ code: string, character: string }` | `{ code }` / `{ error }` | 코드로 입장. 에러: `NO_ROOM` · `FULL` |
-| `round:complete` | `{}` | — | **시퀀스 완성 선언. 서버 수신 순서가 곧 승부** |
-| `round:oppProgress` | `{ progress: number, total: number }` | — | 내 진행률 (상대에게 중계, 판정과 무관) |
-| `peer:id` | `{ code: string, peerId: string }` | — | PeerJS id 교환 (영상은 서버를 지나지 않음) |
+| `room:create` | `{ character: string }` | `{ code }` / `{ error }` | 4자리 방 코드 생성 후 입장. 이전 방에 있었다면 자동으로 나온다 |
+| `room:join` | `{ code: string, character: string }` | `{ code }` / `{ error }` | 코드로 입장. 에러: `NO_ROOM` · `FULL` · `ALREADY_IN` |
+| `room:leave` | — | — | 로비를 떠난다(연습 모드 · 도감 · 대전 중 나가기). **유령 방 방지의 핵심** |
+| `round:complete` | `{}` | — | **시퀀스 완성 선언. 서버 수신 순서가 곧 승부.** 물리적으로 불가능한 속도면 버려진다 |
+| `round:oppProgress` | `{ progress: number, total: number }` | — | 내 진행률 (상대에게 중계, 판정과 무관). 서버가 숫자로 정규화 |
+| `peer:id` | `{ peerId: string }` | — | PeerJS id 교환. **방은 서버가 아는 것만 쓴다** (클라가 준 코드를 믿지 않음) |
 | `disconnect` | — | — | 진행 중이면 남은 쪽 몰수승 후 방 정리 |
 
 ### Socket.IO — Server → Client
@@ -523,10 +565,11 @@ Boot(웹캠 권한) → CharacterSelect(4종) → HandCheck(두 손바닥 1초)
 | --- | --- | --- |
 | `room:state` | `{ code: string, count: number }` | 방 인원 변동 브로드캐스트 |
 | `match:info` | `{ characters: { [socketId]: characterId } }` | 2인 매칭 완료. 각 클라가 자기 것을 빼고 상대 캐릭터를 고른다 |
-| `round:start` | `{ round, sequence: string[], jutsu: { id, name_kr, element } }` | 라운드 시작 + 목표 시퀀스 배포 (양쪽 동일) |
+| `round:start` | `{ round, sequence: string[], timeLimitMs, jutsu: { id, name_kr, element } }` | 라운드 시작 + 목표 시퀀스 배포 (양쪽 동일) |
 | `round:result` | `{ winner, loser, damage, hp: { [socketId]: number } }` | 판정 결과 + 갱신된 HP |
+| `round:timeout` | `{ round, hp }` | **제한시간 내 아무도 완성 못 함 → 무승부.** 데미지 없이 다음 라운드 |
 | `round:oppProgress` | `{ progress, total }` | 상대 진행률 중계 |
-| `match:over` | `{ winner, reason?: 'forfeit' }` | 매치 종료 (HP 0 또는 몰수) |
+| `match:over` | `{ winner, reason?: 'forfeit' \| 'invalid-room' }` | 매치 종료 (HP 0 또는 몰수) |
 | `peer:id` | `{ peerId: string }` | 상대 PeerJS id |
 
 ### 게임 룰 상수 (`shared/constants.js` · `shared/jutsu.js`)
@@ -534,12 +577,16 @@ Boot(웹캠 권한) → CharacterSelect(4종) → HandCheck(두 손바닥 1초)
 | 상수 | 값 | 설명 |
 | --- | --- | --- |
 | `RULES.MAX_HP` | `100` | 시작 체력 |
+| `RULES.DAMAGE_PER_SEAL` | `8` | **매치 길이를 조절하는 유일한 손잡이.** `8` → 2~3라운드 / `5` → 3~6라운드 |
 | `damageFor(len)` | `len × 8` | 시퀀스 길이 비례 데미지 (인술마다 인 3~7개) |
 | `RULES.SEAL_HOLD_MS` | `400` | 인장 확정 홀드 시간 (클라 · 서버 단일 출처) |
+| `RULES.ROUND_TIME_MS` | `30_000` | 라운드 제한시간. 초과 시 무승부로 다음 라운드 |
+| `RULES.MIN_COMPLETE_RATIO` | `0.5` | 완성 신고 최소 시간 계수 — `len × 400ms × 0.5` 보다 빠르면 조작으로 간주 |
 | `NEXT_ROUND_DELAY_MS` | `2000` | 결과 연출 후 다음 라운드까지 |
 | `MLP.ACCEPT` | `0.80` | 1등 확률 하한 |
 | `MLP.MARGIN` | `0.20` | 런너업 마진 |
-| `RECOGNITION.VOTE_WINDOW` | `8` | 시간축 다수결 윈도우 (프레임) |
+| `RECOGNITION.VOTE_WINDOW_MS` | `270` | 시간축 다수결 윈도우 (**ms**). 프레임 수는 fps에서 파생 — 30fps 기준 8프레임 |
+| `RECOGNITION.FPS_THROTTLE` | `30` | 추론 상한 fps. 고fps 카메라에서 GPU를 통째로 태우지 않는다 |
 
 ---
 
@@ -573,10 +620,13 @@ Boot(웹캠 권한) → CharacterSelect(4종) → HandCheck(두 손바닥 1초)
 
 | 컬럼 | 타입 | 설명 |
 | --- | --- | --- |
-| `code` (PK) | `string(4)` | 대문자 + 숫자 4자리 방 코드. Map의 키 |
+| `code` (PK) | `string(4)` | 방 코드. 헷갈리는 `O 0 I 1`을 뺀 32자 집합에서 뽑고, 살아있는 방과 겹치지 않을 때까지 재추첨 |
 | `players` | `string[]` | 소켓 id 배열 (최대 2). 인덱스 0 = 방장 |
 | `characters` | `Record<socketId, characterId>` | 각 플레이어가 고른 캐릭터 |
 | `referee` | `Referee \| null` | 2인 매칭 전에는 `null` |
+
+> **보조 색인 `socketRoom: Map<socketId, code>`** — "한 소켓은 최대 한 방에만 속한다"는 불변식을 O(1)로 보장합니다.
+> 이게 없던 시절엔 방을 여러 번 만들면 방이 쌓이고, 이탈 처리가 그중 하나만 지워 유령 방이 남았습니다.
 
 ### ② `Referee` — 라운드 상태 머신 (방마다 1개, 클로저 상태)
 
@@ -586,8 +636,15 @@ Boot(웹캠 권한) → CharacterSelect(4종) → HandCheck(두 손바닥 1초)
 | `round` | `number` | 현재 라운드 번호 (1부터) |
 | `currentJutsu` | `Jutsu` | 이번 라운드 인술 |
 | `currentSequence` | `string[]` | 목표 인장 id 배열 (양쪽 동일) |
+| `roundStartedAt` | `number` | 라운드 시작 시각. 완성 신고가 물리적으로 가능한 속도인지 검증하는 기준 |
 | `roundResolved` | `boolean` | **이번 라운드 판정 완료 여부. 늦게 도착한 완성 이벤트를 버리는 잠금** |
+| `roundTimer` | `Timeout` | 30초 제한시간 타이머 (판정되면 즉시 해제) |
+| `nextRoundTimer` | `Timeout` | 다음 라운드 예약 타이머 |
 | `over` | `boolean` | 매치 종료 여부 |
+
+> `roster`는 생성 시점 명단의 **복사본**입니다. 호출부가 `room.players`를 갈아끼워도 심판은 원본을 봅니다.
+> 또 2인이 아니면 아예 시작을 거부합니다 — 예전엔 같은 소켓이 두 번 들어간 `[A, A]`로도 심판이 돌아
+> `loser`가 `undefined`가 되고 HP가 `NaN`이 되어 **끝나지 않는 대전**이 열렸습니다.
 
 ### ③ `Seal` — 십이지 인장 (정적, 12행)
 
@@ -702,13 +759,23 @@ node tools/smokeMLP.mjs                                           # ③ 아티�
   경계가 지워졌고, 인장이 통째로 붕괴하는 사고로 이어졌습니다. 자동 필터로 수습했지만
   **처음부터 "무엇이 none인가"를 정의하고 찍었어야** 했습니다.
 
-- **`CalibrationScene`이 고아 씬으로 남았습니다.**
-  기획서에 있던 가이드 박스 · 개인 보정이 Day 5 우선순위에서 밀려 골격만 남았습니다.
-  각도 분산을 줄이는 가장 값싼 수단이었는데 결국 못 넣었습니다.
+- **캘리브레이션을 결국 못 넣었습니다.**
+  기획서에 있던 가이드 박스 · 개인 보정이 Day 5 우선순위에서 밀려 골격만 남았고,
+  그 골격(`CalibrationScene`)마저 씬 흐름에 연결되지 못한 채 마지막에 제거했습니다.
+  각도 분산을 줄이는 가장 값싼 수단이었는데 아쉽습니다.
 
-- **자동화된 테스트가 없습니다.**
-  `replay.mjs` · `smokeMLP.mjs`가 사실상 회귀 테스트 역할을 했지만 수동 실행이고,
-  게임 로직(referee 상태 머신)은 눈으로 확인하는 것 외에 검증 수단이 없었습니다.
+- **게임 로직 검증을 너무 늦게 시작했습니다.**
+  `replay.mjs` · `smokeMLP.mjs`로 인식 쪽은 계속 재고 있었지만, 서버 판정 로직은 6일 내내
+  **눈으로 확인하는 것 외에 검증 수단이 없었습니다.** 그 결과 코드 리뷰를 돌리고 나서야
+  "방을 만든 사람이 자기 코드로 또 입장하면 끝나지 않는 대전이 열린다", "방을 여러 번 만들면
+  유령 방이 쌓인다", "방 밖의 제3자가 남의 방에 peer id를 쏴 웹캠을 가져갈 수 있다" 같은 것들을
+  발견했습니다. 전부 `testServer.mjs`(26개)로 고정했지만, **테스트를 먼저 썼다면 애초에 안 생겼을
+  종류의 버그**였습니다.
+
+- **인식률에만 계측을 걸었습니다.**
+  "측정 없이 손잡이를 돌리지 않는다"는 원칙을 인식 파이프라인엔 철저히 적용했으면서,
+  게임 서버엔 같은 기준을 적용하지 않았습니다. 프로젝트의 심장이 어디인지에 따라
+  엄격함의 배분이 달랐던 셈인데, 판정 로직도 심장이었습니다.
 
 - **스트레치였던 동시 커밋형 모드는 Day 6 게이트에서 컷했습니다.**
   판단 자체는 옳았다고 보지만(코드 프리즈 원칙 준수), 인프라 재사용률이 높았던 만큼 아쉬움이 남습니다.
@@ -716,7 +783,7 @@ node tools/smokeMLP.mjs                                           # ③ 아티�
 ### 🚀 Try — 다음에 시도할 것
 
 - **손 위치 · 각도 가이드를 게임 안으로.**
-  `CalibrationScene`을 살려 가슴 높이 · 정면을 유도하면 입력 분산 자체가 줄어듭니다.
+  캘리브레이션 화면으로 가슴 높이 · 정면을 유도하면 입력 분산 자체가 줄어듭니다.
   모델을 키우는 것보다 싸고 확실한 개선입니다.
 
 - **픽셀을 함께 보는 하이브리드 인식기.**
@@ -732,9 +799,14 @@ node tools/smokeMLP.mjs                                           # ③ 아티�
   "인장 사이 전이 동작", "얼굴 만지기", "손 없음", "다른 사람 손" 같은 **카테고리를 먼저 정의**하고
   카테고리별 목표 장수를 채우는 방식으로 수집. 그 뒤에 임계값을 다시 스윕.
 
-- **referee 상태 머신 단위 테스트.**
-  동시 완성 · 이탈 · 늦은 이벤트 도착 같은 경계 조건은 손으로 재현하기 어렵습니다.
-  소켓을 목킹한 테스트가 있었다면 훨씬 마음 편히 리팩터링했을 겁니다.
+- **테스트를 기능과 같은 시점에 쓰기.**
+  `testServer.mjs`는 결국 만들었지만 **버그를 다 맞고 난 뒤**였습니다. 실제 서버를 띄우고 진짜
+  클라로 붙는 방식이 목킹보다 쓰기도 쉽고 잡아내는 것도 많았으니, 다음엔 방 관리 코드를
+  처음 쓸 때 같이 만들겠습니다.
+
+- **부하·동시성 테스트.**
+  지금 테스트는 전부 2~3명 시나리오입니다. 방이 수십 개 열렸을 때의 메모리·타이머 누수는
+  아직 재본 적이 없습니다.
 
 - **매치 기록 영속화.**
   지금은 매치가 끝나면 모든 게 사라집니다. 라운드별 완성 시간 · 인장별 성공률을 남기면
