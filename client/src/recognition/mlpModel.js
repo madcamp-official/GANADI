@@ -6,7 +6,13 @@
 // ★ 센트로이드와 단위가 다르다. 센트로이드는 "거리"(작을수록 확실), 이쪽은 "확률"(클수록 확실).
 //   임계값을 서로 옮겨 쓰면 조용히 틀린다 — config.js의 RECOGNITION(거리)과 MLP(확률)를 구분할 것.
 
-import * as tf from '@tensorflow/tfjs';
+// ★ '@tensorflow/tfjs' 메타패키지 대신 실제로 쓰는 세 조각만 가져온다.
+//   메타패키지는 tfjs-data·tfjs-converter·노드 백엔드까지 전부 끌고 와 번들이 3.4MB가 됐다.
+//   여기서 필요한 건 loadLayersModel(layers) · predict(core) · WebGL 실행(backend-webgl)뿐이다.
+//   (tools/의 학습 스크립트는 계속 메타패키지를 쓴다 — 그쪽은 번들 크기와 무관하다)
+import * as tf from '@tensorflow/tfjs-core';
+import '@tensorflow/tfjs-backend-webgl';
+import { loadLayersModel } from '@tensorflow/tfjs-layers';
 import { MLP } from '../config.js';
 import { FEAT_LENGTH_V2 } from './featuresV2.js';
 
@@ -23,7 +29,7 @@ let LABELS = [];
  */
 export async function loadMLP(base = '/model/seal-mlp') {
   const [m, meta] = await Promise.all([
-    tf.loadLayersModel(`${base}/model.json`),
+    loadLayersModel(`${base}/model.json`),
     fetch(`${base}/labels.json`).then((r) => r.json()),
   ]);
 

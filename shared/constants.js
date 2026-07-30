@@ -16,9 +16,6 @@ export const SEAL_IDS = [
   'pig',     // 멧돼지
 ];
 
-// Day 2~3 게임용 임시 인식기가 다루는 쉬운 6종 (룰 기반)
-export const EASY_SEAL_IDS = ['dog', 'monkey', 'tiger', 'horse', 'rat', 'rabbit'];
-
 // 실전 시퀀스에 투입하는 인장 (§4.5 — 도감엔 12종 전부, 실전엔 검증된 것만).
 // 서버 대전과 연습 모드가 같은 목록을 봐야 하므로 여기가 단일 출처.
 //
@@ -44,14 +41,17 @@ export const EVENTS = {
   // 로비/방
   CREATE_ROOM: 'room:create',
   JOIN_ROOM: 'room:join',
+  LEAVE_ROOM: 'room:leave',         // 클라 → 서버: 로비를 떠난다(연습 모드 등). 유령 방 방지
   ROOM_STATE: 'room:state',
-  PLAYER_LEFT: 'room:playerLeft',
   MATCH_INFO: 'match:info',         // 서버 → 각 클라: 상대 캐릭터 등 매치 정보
+  // (room:playerLeft는 없앴다 — 2인 방엔 항상 심판이 붙어 있어 "매칭 전 상대 이탈"이라는
+  //  상태가 존재하지 않는다. 이탈 통보는 MATCH_OVER{reason:'forfeit'}가 전담한다.)
 
   // 라운드 진행 (서버 권위)
   ROUND_START: 'round:start',       // 서버 → 클라: 시퀀스 배포
   SEQ_COMPLETE: 'round:complete',   // 클라 → 서버: 시퀀스 완성 @timestamp
   ROUND_RESULT: 'round:result',     // 서버 → 클라: 승자/데미지 브로드캐스트
+  ROUND_TIMEOUT: 'round:timeout',   // 서버 → 클라: 제한시간 내 아무도 못 끝냄 (무승부)
   OPP_PROGRESS: 'round:oppProgress',// 상대 진행 상황 실시간 표시
 
   // 화상 시그널링 (PeerJS id 교환)
@@ -64,6 +64,21 @@ export const EVENTS = {
 // 게임 룰 상수
 export const RULES = {
   MAX_HP: 100,
-  DAMAGE: { 3: 20, 5: 40 }, // 시퀀스 길이별 데미지
   SEAL_HOLD_MS: 400,        // 인장 확정 홀드 시간
+
+  // 인 1개당 데미지. 실제 데미지는 damageFor(시퀀스 길이) = 길이 × 이 값 (shared/jutsu.js).
+  // ★ 매치 길이를 조절하는 유일한 손잡이다. 인술의 인 개수는 3~7이므로
+  //   8 → 24~56 데미지 → 2~3라운드 / 5 → 15~35 → 3~6라운드.
+  //   (예전엔 DAMAGE:{3:20,5:40} 표가 여기 있었지만 아무도 읽지 않는 죽은 값이었다.)
+  DAMAGE_PER_SEAL: 8,
+
+  // 라운드 제한시간 — 이 시간 안에 아무도 시퀀스를 못 끝내면 무승부로 넘긴다.
+  // ★ 없으면 인식이 한 번 미끄러졌을 때 라운드가 영원히 멈춘다(시연 데드락).
+  //   6인 인술 기준 인당 (홀드 400ms + 다수결·자세 전환) ≈ 2~3초라 30초면 넉넉하다.
+  ROUND_TIME_MS: 30_000,
+
+  // 완성 신고 최소 소요시간의 안전계수 — 물리적으로 불가능한 속도의 SEQ_COMPLETE를 거른다.
+  // 인 1개를 확정하려면 최소 SEAL_HOLD_MS가 필요하므로 길이×홀드×이 비율보다 빠르면 조작이다.
+  // 0.5로 느슨하게 잡아 정상 플레이어가 걸리지 않게 한다 (치트 방지가 목적, 실력 제한이 아님).
+  MIN_COMPLETE_RATIO: 0.5,
 };

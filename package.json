@@ -2,7 +2,8 @@
   "name": "ganadi",
   "version": "0.1.0",
   "private": true,
-  "description": "인술대전 (가제) — 웹캠 손 인식 1:1 대전 웹게임",
+  "type": "module",
+  "description": "나루도 — 웹캠 손 인식 1:1 대전 웹게임",
   "workspaces": [
     "client",
     "server"
@@ -11,9 +12,13 @@
     "dev:client": "npm run dev --workspace client",
     "dev:server": "npm run dev --workspace server",
     "build:client": "npm run build --workspace client",
-    "collect": "vite --port 5174 --open /hand-test/collector.html"
+    "collect": "vite --port 5174 --open /hand-test/collector.html",
+    "vendor:mediapipe": "node tools/vendorMediapipe.mjs",
+    "test:server": "node tools/testServer.mjs"
   },
   "devDependencies": {
-    "jpeg-js": "^0.4.4"
+    "@tensorflow/tfjs": "^4.20.0",
+    "jpeg-js": "^0.4.4",
+    "socket.io-client": "^4.7.5"
   }
 }

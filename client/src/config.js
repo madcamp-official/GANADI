@@ -29,9 +29,17 @@ export const RECOGNITION = {
   MARGIN: 0.5,           // 1등이 2등보다 이만큼 더 가까워야 인정 (런너업 마진, §4.2)
 
   // --- 안정화 ---
-  VOTE_WINDOW: 8,   // 시간축 다수결 윈도우 (프레임). §4.4
-  FPS_THROTTLE: 20, // 추론 스로틀 (Step 7에서 적용). 이 값을 낮추면 VOTE_WINDOW도 같이 줄여야
-                    // 다수결이 실시간 기준으로 길어지지 않는다.
+  // 시간축 다수결(§4.4)은 "몇 프레임"이 아니라 "몇 ms"로 정의한다.
+  // ★ 예전엔 VOTE_WINDOW가 8프레임 고정이고 FPS_THROTTLE은 아무데서도 안 읽혔다.
+  //   그래서 스로틀을 켜는 순간 다수결 구간이 실시간 기준으로 길어져 인식이 굼떠지는 함정이 있었다.
+  //   ms로 정의하고 프레임 수를 파생시키면 FPS를 바꿔도 체감 반응이 그대로다.
+  VOTE_WINDOW_MS: 270,
+  FPS_THROTTLE: 30, // 추론 상한 fps. 카메라가 60fps여도 이 이상은 추론하지 않는다.
+
+  /** 다수결 윈도우 (프레임). 현재 값 기준 270ms ÷ 33.3ms ≈ 8 — 튜닝 당시와 같다 */
+  get VOTE_WINDOW() {
+    return Math.max(1, Math.round(this.VOTE_WINDOW_MS / (1000 / this.FPS_THROTTLE)));
+  },
 };
 
 // --- MLP 임계값 (단위: 0~1 확률) ---

@@ -60,10 +60,17 @@ export default class HandCheckScene extends Phaser.Scene {
     // 씬을 벗어나도 추적 루프는 계속 돈다 — 구독만 끊는다
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => { this.unsubscribe?.(); this.unsubscribe = null; });
 
-    if (!camOn) { this.status.setText('⚠ 웹캠 권한을 허용해주세요').setColor(CSS.lose); return; }
+    // BootScene이 남긴 실패 사유를 그대로 보여준다 — "허용해주세요"만 뜨면
+    // 카메라가 아예 없는 것인지, 다른 앱이 쓰고 있는 것인지 구분할 수 없다.
+    if (!camOn) {
+      const err = this.registry.get('cameraError');
+      this.status.setText(CAMERA_HINT[err] ?? '⚠ 웹캠 권한을 허용해주세요').setColor(CSS.lose);
+      return;
+    }
     try {
       const tracker = await getHandTracker(video);
       if (!this.scene.isActive()) return; // 로딩 중 씬을 떠났으면 구독 안 함
+      tracker.start(); // 다른 씬에서 멈춰뒀을 수 있다 (이미 돌고 있으면 no-op)
       // ★ 대전 씬이 registry.get('recognizer')로 집어간다 (BattleScene.attachRecognizer)
       this.registry.set('recognizer', tracker.recognizer);
       this.registry.set('handTracker', tracker);
@@ -125,6 +132,16 @@ export default class HandCheckScene extends Phaser.Scene {
     seg(x, y, 1, 1); seg(x + w, y, -1, 1); seg(x, y + h, 1, -1); seg(x + w, y + h, -1, -1);
   }
 }
+
+// getUserMedia가 던지는 DOMException.name → 사용자가 실제로 할 수 있는 행동.
+// BootScene.requestCamera()가 registry에 'cameraError'로 넣어둔다.
+const CAMERA_HINT = {
+  NotAllowedError: '⚠ 웹캠 권한이 거부됐어요 — 주소창의 카메라 아이콘에서 허용해주세요',
+  NotFoundError: '⚠ 웹캠을 찾을 수 없어요 — 카메라를 연결한 뒤 새로고침해주세요',
+  NotReadableError: '⚠ 다른 앱이 웹캠을 쓰고 있어요 — 화상회의·카메라 앱을 종료해주세요',
+  OverconstrainedError: '⚠ 웹캠이 요청한 해상도를 지원하지 않아요',
+  SecurityError: '⚠ https 또는 localhost에서만 웹캠을 쓸 수 있어요',
+};
 
 // flip: 1=오른손(엄지 왼쪽), -1=왼손(엄지 오른쪽/안쪽으로 미러)
 function drawPalm(g, x, y, flip = 1) {

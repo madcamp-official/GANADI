@@ -11,14 +11,34 @@ import { pickJutsu, jutsuSeals, damageFor } from '../../../shared/jutsu.js';
 import { SEALS } from '../data/seals.js';
 import { getCharacter, spriteKey } from '../data/characters.js';
 import { getSocket } from '../net/socket.js';
+import { resumeHandTracker } from '../recognition/handTracker.js';
 import { startVideoCall } from '../net/webrtc.js';
 import { GAME } from '../config.js';
-import { drawForest, darkPanel, pill, CSS, C, hex, hiDPI, KANJI_FONT } from '../ui/theme.js';
+import { drawForest, darkPanel, button, pill, CSS, C, hex, hiDPI, KANJI_FONT } from '../ui/theme.js';
 import { holdGaugeView } from '../ui/holdGauge.js';
 const W = GAME.WIDTH, H = GAME.HEIGHT;
 const CPU_ID = '__cpu__';            // 연습 모드의 가상 상대
 
 const NEXT_ROUND_DELAY_MS = 2000;    // referee.js와 같은 간격
+
+// 인장 타일 기본 크기. 인이 6~7개인 인술에선 아래 tileLayout()이 비례 축소한다.
+const TILE_W = 150, TILE_H = 190, TILE_GAP = 22, TILE_CY = 320;
+// 타일이 침범하면 안 되는 좌우 영역 = 양쪽 캐릭터 스프라이트. 그 사이 폭 안에서만 그린다.
+// (예전엔 150px 고정이라 6·7인 인술에서 양 끝 타일이 캐릭터 위에 겹쳐 그려졌다)
+const TILE_SAFE_W = W - 2 * (110 + 100) - 20; // 화면폭 - 양쪽(캐릭터 중심+반폭) - 여유
+
+// 라운드 제한시간 바 — 목표 인장 pill(y≈145~191)과 타일 상단(y≈225) 사이 빈 띠.
+const TIMER_W = 420, TIMER_H = 10, TIMER_Y = 196;
+// "3·2·1·시작!" 연출에 걸리는 시간 (startCountdown의 650×3 + 450). 제한시간에서 빼야
+// 서버 타이머(ROUND_START부터)보다 클라 바가 늦게 0이 되는 일이 없다.
+const COUNTDOWN_MS = 650 * 3 + 450;
+
+/** n개 타일이 캐릭터를 안 가리도록 필요한 만큼만 축소한 레이아웃 */
+function tileLayout(n) {
+  const ideal = n * TILE_W + (n - 1) * TILE_GAP;
+  const s = Math.min(1, TILE_SAFE_W / ideal);
+  return { w: TILE_W * s, h: TILE_H * s, gap: TILE_GAP * s, s };
+}
 
 // 좌우 진영 — 내 쪽 = 왼쪽, 상대 = 오른쪽. HP 패널(좌=나 / 우=상대)과 같은 편에 둔다.
 // 캐릭터·웹캠·발사체 방향이 전부 이 상수를 따르므로 진영을 바꾸려면 여기만 뒤집으면 된다.
@@ -77,6 +97,9 @@ export default class BattleScene extends Phaser.Scene {
     this.progress = 0;
     this.locked = true; // 라운드 시작 전엔 입력 잠금
     this.round = 0;
+    this.tile = tileLayout(1);
+    this.roundDeadline = 0;  // 제한시간 종료 시각 (performance 기준 씬 시계)
+    this.matchEnded = false;
     this.hp = this.practice
       ? { [this.myId]: RULES.MAX_HP, [CPU_ID]: RULES.MAX_HP }
       : { [this.myId]: RULES.MAX_HP };
@@ -91,16 +114,28 @@ export default class BattleScene extends Phaser.Scene {
     if (!this.practice) {
       this.socket.on(EVENTS.ROUND_START, (p) => this.onRoundStart(p));
       this.socket.on(EVENTS.ROUND_RESULT, (p) => this.onRoundResult(p));
+      this.socket.on(EVENTS.ROUND_TIMEOUT, (p) => this.onRoundTimeout(p));
       this.socket.on(EVENTS.OPP_PROGRESS, ({ progress, total }) => this.drawOppProgress(progress, total));
       this.socket.once(EVENTS.MATCH_OVER, (p) => this.onMatchOver(p));
+      // 연결이 끊기면 서버가 방을 지우므로 이 대전은 끝난 것이다. 멈춘 화면 대신 상황을 알린다.
+      this._onDisconnect = () => this.onConnectionLost();
+      this.socket.on('disconnect', this._onDisconnect);
     }
 
     // A 인식기 연결 (registry에 있으면). 없으면 스페이스 폴백.
     this.recognizer = this.registry.get('recognizer') ?? null;
     if (this.recognizer) this.attachRecognizer(this.recognizer);
     this.subscribeRecognition(); // 인식 게이지용 프레임 구독
+    // 스페이스 폴백 (인식기 없이 진행할 때). 인장 하나당 최소 SEAL_HOLD_MS를 강제한다.
+    // ★ 이게 없으면 연타로 시퀀스를 순식간에 끝낼 수 있는데, 서버 심판은 그런 완성 신고를
+    //   조작으로 보고 버린다(minCompleteMs). 그러면 클라만 "완성"이라 믿고 잠긴 채
+    //   라운드 제한시간까지 아무 일도 안 일어난다. 실제 손 인식은 홀드 때문에 자연히 이 속도를 못 넘는다.
+    this.lastSpaceMs = 0;
     this.input.keyboard.on('keydown-SPACE', () => {
-      if (!this.locked && this.progress < this.sequence.length) this.onSealMatched(this.sequence[this.progress]);
+      if (this.locked || this.progress >= this.sequence.length) return;
+      if (this.time.now - this.lastSpaceMs < RULES.SEAL_HOLD_MS) return;
+      this.lastSpaceMs = this.time.now;
+      this.onSealMatched(this.sequence[this.progress]);
     });
 
     // 화상 (joiner가 발신). 연습 모드엔 없음.
@@ -116,7 +151,10 @@ export default class BattleScene extends Phaser.Scene {
       if (this.socket) {
         this.socket.off(EVENTS.ROUND_START);
         this.socket.off(EVENTS.ROUND_RESULT);
+        this.socket.off(EVENTS.ROUND_TIMEOUT);
         this.socket.off(EVENTS.OPP_PROGRESS);
+        this.socket.off(EVENTS.MATCH_OVER); // once라도 매치가 끝나기 전에 씬을 뜨면 남는다
+        if (this._onDisconnect) this.socket.off('disconnect', this._onDisconnect);
       }
       this.video?.stop();
       if (this.recognizer) this.recognizer.onSeal = () => {};
@@ -132,17 +170,40 @@ export default class BattleScene extends Phaser.Scene {
   // ── 연습 모드: 서버 심판이 하던 일을 로컬에서 ──
   // 랜덤 인술 하나를 뽑아 그 인의 순서를 목표 시퀀스로 쓴다 (서버와 같은 pickJutsu).
   startPracticeRound() {
+    if (this.matchEnded) return;
     this.round += 1;
     const j = pickJutsu(PLAYABLE_SEAL_IDS);
     this.onRoundStart({ round: this.round, sequence: jutsuSeals(j), jutsu: j });
   }
 
-  resolvePracticeRound() {
-    const damage = damageFor(this.sequence.length);
-    this.hp[CPU_ID] = Math.max(0, this.hp[CPU_ID] - damage);
-    this.onRoundResult({ winner: this.myId, hp: { ...this.hp } });
-    if (this.hp[CPU_ID] <= 0) this.time.delayedCall(NEXT_ROUND_DELAY_MS, () => this.onMatchOver({ winner: this.myId }));
-    else this.time.delayedCall(NEXT_ROUND_DELAY_MS, () => this.startPracticeRound());
+  // 연습 모드의 제한시간 — 서버 심판의 roundTimer에 해당한다.
+  // ★ 시간을 넘기면 연습 상대가 반격한다. 예전엔 CPU가 데미지를 줄 방법이 아예 없어서
+  //   플레이어 HP가 영원히 100이었고(샌드백), 인식이 막히면 라운드가 무한정 멈췄다.
+  armPracticeTimeout() {
+    this.practiceTimer?.remove();
+    this.practiceTimer = this.time.delayedCall(
+      Math.max(1000, this.roundLimitMs - COUNTDOWN_MS),
+      () => this.resolvePracticeRound(CPU_ID),
+    );
+  }
+
+  /** @param {string} winnerId 이번 라운드 승자 (기본: 나) */
+  resolvePracticeRound(winnerId = this.myId) {
+    if (this.matchEnded) return;
+    this.practiceTimer?.remove();
+    this.practiceTimer = null;
+    this.locked = true;
+    this.roundDeadline = 0;
+
+    const loserId = winnerId === this.myId ? CPU_ID : this.myId;
+    this.hp[loserId] = Math.max(0, this.hp[loserId] - damageFor(this.sequence.length));
+    this.onRoundResult({ winner: winnerId, hp: { ...this.hp } });
+
+    const done = this.hp[loserId] <= 0;
+    this.time.delayedCall(NEXT_ROUND_DELAY_MS, () => {
+      if (done) this.onMatchOver({ winner: winnerId });
+      else this.startPracticeRound();
+    });
   }
 
   buildStaticUI() {
@@ -175,6 +236,14 @@ export default class BattleScene extends Phaser.Scene {
     // 목표 인장 라벨
     this.targetPill = pill(this, W / 2, 168, '목표 인장 0/0', { fill: 0x2a3a2b, textColor: CSS.orange, bold: true });
 
+    // 라운드 제한시간 바 — 타일 위 빈 띠(y 195~215)에. 서버 심판의 ROUND_TIME_MS와 같은 시계를 그린다.
+    // 이게 없으면 사용자는 라운드에 시간이 있다는 사실 자체를 모른다.
+    this.timerGfx = this.add.graphics();
+    this.timerText = this.add.text(W / 2 + TIMER_W / 2 + 34, 201, '', {
+      fontSize: '15px', fontFamily: 'monospace', fontStyle: 'bold', color: CSS.sun,
+    }).setOrigin(0.5);
+    this.drawRoundTimer(0);
+
     // 인장 타일 컨테이너
     this.sealRow = this.add.container(0, 0);
 
@@ -198,6 +267,39 @@ export default class BattleScene extends Phaser.Scene {
     }).setOrigin(0.5).setDepth(21);
 
     this.drawFighters();
+    this.buildExitButton();
+
+    // 인식기 없이 들어온 경우(손 인식 관문에서 "건너뛰기") 조작법을 알려준다.
+    // 안 그러면 사용자는 "인식이 안 된다"고만 느끼고 스페이스바를 쓸 생각을 못 한다.
+    if (!this.registry.get('recognizer')) {
+      pill(this, W / 2, 690, '⌨ 손 인식 없음 — 스페이스바로 인장을 맺으세요', {
+        fill: 0x5a3a1a, border: C.orange, textColor: CSS.sun, bold: true, fontSize: '16px',
+      });
+    }
+  }
+
+  // 나가기 — 대전 중에도 로비로 돌아갈 수 있어야 한다.
+  // HP 패널(좌상단)과 겹치지 않게 좌하단에 둔다. 온라인이면 서버에 방을 떠난다고 알린다.
+  buildExitButton() {
+    const b = button(this, 78, 688, 124, 46, '← 나가기', { fontSize: '17px' });
+    b.g.setDepth(400); b.t.setDepth(401); b.zone.setDepth(401);
+    b.zone.on('pointerdown', () => this.leaveToLobby());
+  }
+
+  leaveToLobby() {
+    this.matchEnded = true;
+    this.locked = true;
+    this.socket?.emit(EVENTS.LEAVE_ROOM); // 서버에 유령 방을 남기지 않는다
+    this.scene.start('Lobby');
+  }
+
+  onConnectionLost() {
+    if (this.matchEnded) return;
+    this.matchEnded = true;
+    this.locked = true;
+    this.banner.setText('서버 연결 끊김').setColor(CSS.lose);
+    this.subText.setText('로비로 돌아갑니다…');
+    this.time.delayedCall(1800, () => this.scene.start('Lobby'));
   }
 
   drawFighters() {
@@ -250,16 +352,21 @@ export default class BattleScene extends Phaser.Scene {
     if (this.remoteCam) this.remoteCam.style.display = 'none';
   }
 
-  onRoundStart({ round, sequence, jutsu }) {
+  onRoundStart({ round, sequence, jutsu, timeLimitMs }) {
+    if (this.matchEnded) return;
     this.sequence = sequence;
+    this.tile = tileLayout(sequence.length); // 6·7인 인술은 여기서 축소돼 캐릭터를 안 가린다
     this.currentJutsu = jutsu ?? null; // 서버가 보낸 인술 (온라인) 또는 연습에서 넘긴 것
     this.jutsuLabel.setText(jutsu?.name_kr ?? '');
     this.progress = 0;
     this.locked = true;
+    this.roundLimitMs = timeLimitMs ?? RULES.ROUND_TIME_MS;
+    this.roundDeadline = 0; // 카운트다운이 끝나야 시작
     this.roundText.setText(`ROUND ${round}`);
     this.roundSub.setText(`SEQ ${sequence.length}`);
     this.renderSeals();
     this.drawOppProgress(0, sequence.length);
+    this.drawRoundTimer(1);
     this.startCountdown();
   }
 
@@ -273,9 +380,54 @@ export default class BattleScene extends Phaser.Scene {
       this.cd.setScale(1.4); this.tweens.add({ targets: this.cd, scale: 1, duration: 300 });
       i += 1;
       if (i < steps.length) this.time.delayedCall(650, tick);
-      else this.time.delayedCall(450, () => { this.cd.setVisible(false); this.subText.setText(''); this.locked = false; });
+      else this.time.delayedCall(450, () => {
+        this.cd.setVisible(false);
+        this.subText.setText('');
+        this.locked = false;
+        // 제한시간 시작. 서버 심판의 타이머는 ROUND_START 시점부터라 여기(카운트다운 후)보다
+        // 약 2.4초 이르다 — 클라 바가 먼저 0이 되는 일이 없도록 그만큼 짧게 잡는다.
+        this.roundDeadline = this.time.now + Math.max(1000, this.roundLimitMs - COUNTDOWN_MS);
+        if (this.practice) this.armPracticeTimeout();
+      });
     };
     tick();
+  }
+
+  // 매 프레임 제한시간 바를 갱신. 판정이 끝났거나(locked) 라운드 전이면 그리지 않는다.
+  update() {
+    if (!this.roundDeadline || this.locked) return;
+    const left = this.roundDeadline - this.time.now;
+    this.drawRoundTimer(left / Math.max(1, this.roundLimitMs - COUNTDOWN_MS));
+  }
+
+  drawRoundTimer(ratio) {
+    const g = this.timerGfx;
+    if (!g) return;
+    const p = Number.isFinite(ratio) ? Math.max(0, Math.min(1, ratio)) : 0;
+    const x = W / 2 - TIMER_W / 2;
+    g.clear();
+    g.fillStyle(C.woodShadow, 0.8).fillRoundedRect(x, TIMER_Y, TIMER_W, TIMER_H, TIMER_H / 2);
+    if (p > 0) {
+      // 30% 미만이면 빨강으로 — 남은 시간이 촉박하다는 걸 색으로 먼저 알린다
+      g.fillStyle(p < 0.3 ? C.lose : C.sun, 1)
+        .fillRoundedRect(x, TIMER_Y, TIMER_W * p, TIMER_H, TIMER_H / 2);
+    }
+    const secs = this.roundDeadline && !this.locked
+      ? Math.max(0, Math.ceil((this.roundDeadline - this.time.now) / 1000))
+      : Math.ceil((this.roundLimitMs ?? RULES.ROUND_TIME_MS) / 1000);
+    this.timerText?.setText(`${secs}s`).setColor(p < 0.3 ? CSS.lose : CSS.sun);
+  }
+
+  // 제한시간 초과 — 아무도 완성 못 함. 데미지 없이 다음 라운드 (서버가 판정하고 여기선 연출만).
+  onRoundTimeout({ hp } = {}) {
+    if (this.matchEnded) return;
+    this.locked = true;
+    this.roundDeadline = 0;
+    this.drawRoundTimer(0);
+    if (hp) { this.hp = hp; this.drawHp(); }
+    this.banner.setText('시간 초과!').setColor('#ffd27a');
+    this.subText.setText('아무도 인술을 완성하지 못했다');
+    this.time.delayedCall(1400, () => { this.banner.setText(''); this.subText.setText(''); });
   }
 
   // ── A ↔ B 계약 연결 지점 ── recognizer.onSeal → onSealMatched
@@ -289,6 +441,7 @@ export default class BattleScene extends Phaser.Scene {
   subscribeRecognition() {
     const tracker = this.registry.get('handTracker');
     if (!tracker) return; // 인식기 없이 스페이스 폴백으로 도는 경우
+    resumeHandTracker(); // 로비·도감에서 멈춰뒀던 루프를 여기서 다시 켠다
     this.unsubFrame = tracker.onFrame(({ state }) => this.drawHoldGauge(state));
   }
 
@@ -303,8 +456,9 @@ export default class BattleScene extends Phaser.Scene {
     if (!view) return;
 
     const seal = SEALS[view.sealId] ?? { name: view.sealId };
-    const x = this.sealX(this.progress), y = 320 + 190 / 2 + 26;
-    const w = 150, h = 14;
+    // 게이지는 현재 목표 타일 바로 아래. 타일이 축소된 라운드(6·7인)에서도 따라붙어야 한다.
+    const x = this.sealX(this.progress), y = TILE_CY + this.tile.h / 2 + 26;
+    const w = this.tile.w, h = 14;
 
     g.fillStyle(C.woodShadow, 0.85).fillRoundedRect(x - w / 2, y, w, h, h / 2);
     if (view.fill > 0) {
@@ -323,7 +477,7 @@ export default class BattleScene extends Phaser.Scene {
     if (sealId !== this.sequence[this.progress]) return;
     this.progress += 1;
     this.renderSeals();
-    this.spark(this.sealX(this.progress - 1), 320, C.orange);
+    this.spark(this.sealX(this.progress - 1), TILE_CY, C.orange);
     this.socket?.emit(EVENTS.OPP_PROGRESS, { progress: this.progress, total: this.sequence.length });
 
     if (this.progress >= this.sequence.length) {
@@ -335,7 +489,9 @@ export default class BattleScene extends Phaser.Scene {
 
   renderSeals() {
     this.sealRow.removeAll(true);
-    const n = this.sequence.length, boxW = 150, boxH = 190, y = 320;
+    const n = this.sequence.length, y = TILE_CY;
+    const { w: boxW, h: boxH, s } = this.tile; // s = 축소 배율 (6·7인 인술에서 1 미만)
+    const px = (v) => `${Math.round(v * s)}px`; // 글자도 타일과 같은 비율로 줄인다
     this.targetPill.t.setText(`목표 인장 ${this.progress}/${n}`);
 
     this.sequence.forEach((id, i) => {
@@ -351,25 +507,26 @@ export default class BattleScene extends Phaser.Scene {
       g.lineStyle(current ? 6 : 4, current ? C.orange : C.woodDark, 1).strokeRoundedRect(x - boxW / 2, y - boxH / 2, boxW, boxH, 12);
       this.sealRow.add(g);
 
-      const kanji = this.add.text(x, y - 18, seal.kanji, {
-        fontFamily: KANJI_FONT, fontSize: '72px', fontStyle: 'bold', color: future ? '#b9a888' : CSS.outline,
+      const kanji = this.add.text(x, y - 18 * s, seal.kanji, {
+        fontFamily: KANJI_FONT, fontSize: px(72), fontStyle: 'bold', color: future ? '#b9a888' : CSS.outline,
       }).setOrigin(0.5);
-      const name = this.add.text(x, y + 62, seal.name, { fontSize: '18px', color: future ? '#a99a7a' : '#6a5535' }).setOrigin(0.5);
+      const name = this.add.text(x, y + 62 * s, seal.name, { fontSize: px(18), color: future ? '#a99a7a' : '#6a5535' }).setOrigin(0.5);
       this.sealRow.add([kanji, name]);
 
       if (done) {
-        const stamp = this.add.text(x + 30, y - 30, '印', { fontFamily: KANJI_FONT, fontSize: '54px', fontStyle: 'bold', color: hex(C.orange) }).setOrigin(0.5).setAngle(-12).setAlpha(0.9);
+        const stamp = this.add.text(x + 30 * s, y - 30 * s, '印', { fontFamily: KANJI_FONT, fontSize: px(54), fontStyle: 'bold', color: hex(C.orange) }).setOrigin(0.5).setAngle(-12).setAlpha(0.9);
         this.sealRow.add(stamp);
       }
       if (current) {
-        const b = pill(this, x, y - boxH / 2 - 6, '지금 이것!', { fill: C.orange, textColor: CSS.scroll, bold: true, fontSize: '15px' });
+        const b = pill(this, x, y - boxH / 2 - 6, '지금 이것!', { fill: C.orange, textColor: CSS.scroll, bold: true, fontSize: px(15) });
         this.sealRow.add([b.g, b.t]);
       }
     });
   }
 
   sealX(i) {
-    const n = this.sequence.length, boxW = 150, gap = 22;
+    const n = this.sequence.length;
+    const { w: boxW, gap } = this.tile;
     const totalW = n * boxW + (n - 1) * gap;
     return (W - totalW) / 2 + boxW / 2 + i * (boxW + gap);
   }
@@ -387,6 +544,10 @@ export default class BattleScene extends Phaser.Scene {
   }
 
   onRoundResult({ winner, hp }) {
+    if (this.matchEnded) return;
+    this.locked = true;      // 판정 후 다음 라운드까지 입력 잠금
+    this.roundDeadline = 0;  // 제한시간 바 정지
+    this.drawRoundTimer(0);
     this.hp = hp;
     this.drawHp();
     const iWon = winner === this.myId;
@@ -473,7 +634,10 @@ export default class BattleScene extends Phaser.Scene {
   }
 
   onMatchOver({ winner }) {
+    if (this.matchEnded) return;
+    this.matchEnded = true;
     this.locked = true;
+    this.practiceTimer?.remove();
     this.scene.start('Result', { won: winner === this.myId });
   }
 

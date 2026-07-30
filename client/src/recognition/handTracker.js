@@ -9,6 +9,7 @@
 
 import { createHandLandmarker } from './handLandmarker.js';
 import { createRecognizer } from './recognizer.js';
+import { RECOGNITION } from '../config.js';
 
 /**
  * 프레임 루프 본체 — 의존성을 전부 주입받는다(테스트를 위해).
@@ -19,6 +20,7 @@ export function createHandTracker({ landmarker, video, recognizer, raf, cancelRa
   let handle = null;
   let running = false;
   let lastVideoTime = -1;
+  let lastInferMs = -Infinity;
   let frames = 0;   // 실제로 추론한 프레임 수 (디버그용)
   let last = { hands: [], state: null, nowMs: 0 };
 
@@ -31,9 +33,14 @@ export function createHandTracker({ landmarker, video, recognizer, raf, cancelRa
 
     // 같은 프레임을 두 번 추론하지 않는다 — 화면 주사율이 카메라 fps보다 높을 때 낭비 방지
     if (video.currentTime === lastVideoTime) return;
+
+    // 추론 상한 (RECOGNITION.FPS_THROTTLE). 고fps 카메라에서 GPU를 통째로 태우지 않는다.
+    // 다수결 윈도우는 config가 이 값으로부터 프레임 수를 파생하므로 체감 반응은 그대로다.
+    const nowMs = now();
+    if (nowMs - lastInferMs < 1000 / RECOGNITION.FPS_THROTTLE) return;
+    lastInferMs = nowMs;
     lastVideoTime = video.currentTime;
 
-    const nowMs = now();
     let hands = [];
     try {
       hands = landmarker.detectForVideo(video, nowMs)?.landmarks ?? [];
@@ -124,4 +131,19 @@ export async function getHandTracker(video = document.getElementById('local-cam'
 /** 이미 만들어졌으면 반환, 아니면 null (로딩을 기다리기 싫은 곳용) */
 export function peekHandTracker() {
   return instance;
+}
+
+/**
+ * 인식이 필요 없는 씬(로비·도감·결과·캐릭터 선택)에서 루프를 멈춘다.
+ * ★ 예전엔 추적기가 한 번 뜨면 앱이 닫힐 때까지 모든 화면에서 계속 돌았다 —
+ *   아무도 안 보는 동안 초당 30회 GPU 추론을 하니 시연용 노트북이 뜨거워지고 배터리가 샌다.
+ *   모델은 살려두므로(인스턴스 유지) 다시 켤 때 로딩이 없다.
+ */
+export function pauseHandTracker() {
+  instance?.stop();
+}
+
+/** 인식이 필요한 씬(손 인식 관문·대전)에서 다시 돌린다. 추적기가 없으면 아무 일도 안 한다 */
+export function resumeHandTracker() {
+  instance?.start();
 }

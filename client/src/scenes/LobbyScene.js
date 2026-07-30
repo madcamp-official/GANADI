@@ -4,6 +4,7 @@
 import Phaser from 'phaser';
 import { EVENTS } from '../../../shared/constants.js';
 import { connect } from '../net/socket.js';
+import { pauseHandTracker } from '../recognition/handTracker.js';
 import { DEFAULT_CHARACTER } from '../data/characters.js';
 import { GAME } from '../config.js';
 import { drawForest, button, CSS, C, hex, hiDPI, FONT, KANJI_FONT } from '../ui/theme.js';
@@ -15,6 +16,7 @@ export default class LobbyScene extends Phaser.Scene {
 
   create() {
     hiDPI(this);
+    pauseHandTracker(); // 로비에선 손 인식이 필요 없다 — 대전 씬이 다시 켠다
     this.socket = connect();
     const W = GAME.WIDTH;
     drawForest(this);
@@ -27,9 +29,9 @@ export default class LobbyScene extends Phaser.Scene {
       fontSize: '26px', fontStyle: 'bold', color: CSS.orange, letterSpacing: 4,
     }).setOrigin(0.5);
 
-    // 인장 도감 버튼 (우상단)
+    // 인장 도감 버튼 (우상단). 방을 만들어둔 채로 나가면 유령 방이 되므로 먼저 빠져나간다.
     const codex = button(this, W - 110, 52, 180, 56, '📜 인장 도감', { fontSize: '18px' });
-    codex.zone.on('pointerdown', () => this.scene.start('Codex'));
+    codex.zone.on('pointerdown', () => this.leaveRoomAnd(() => this.scene.start('Codex')));
 
     // 폼 패널 (DOM — 버튼/입력창 + 연습 모드). 연습은 서버·상대 없이 혼자.
     const panel = this.add.dom(W / 2, GAME.HEIGHT / 2 + 70).createFromHTML(`
@@ -48,11 +50,16 @@ export default class LobbyScene extends Phaser.Scene {
       </div>
     `);
     const root = panel.node;
+    const codeInput = root.querySelector('#code');
     this.err = root.querySelector('#err');
     root.querySelector('#create').onclick = () => this.createRoom();
-    root.querySelector('#join').onclick = () => this.joinRoom(root.querySelector('#code').value);
-    // 연습 모드는 소켓을 아예 쓰지 않는다 — 서버 없어도 바로 시작
-    root.querySelector('#practice').onclick = () => this.scene.start('Battle', { practice: true });
+    root.querySelector('#join').onclick = () => this.joinRoom(codeInput.value);
+    // Enter로도 입장 (코드를 치고 나면 손이 이미 키보드에 있다)
+    codeInput.onkeydown = (e) => { if (e.key === 'Enter') this.joinRoom(codeInput.value); };
+    // 연습 모드는 소켓을 아예 쓰지 않는다 — 서버 없어도 바로 시작.
+    // ★ 만들어둔 방은 서버에서 반드시 빼고 간다. 안 그러면 그 방이 살아남아,
+    //   코드를 아는 사람이 들어올 때 연습 중인 화면이 갑자기 대전으로 튄다(유령 방).
+    root.querySelector('#practice').onclick = () => this.leaveRoomAnd(() => this.scene.start('Battle', { practice: true }));
 
     // 상태바 (DOM — 방 코드 드래그 선택 + 복사 버튼)
     this.statusDom = this.add.dom(W / 2, GAME.HEIGHT - 56).createFromHTML(`<div id="s" style="${styStatus}"></div>`);
@@ -85,6 +92,13 @@ export default class LobbyScene extends Phaser.Scene {
     });
   }
 
+  /** 서버에서 방을 뺀 뒤 다른 화면으로. 대전으로 넘어갈 때는 쓰지 않는다(그땐 방이 있어야 한다) */
+  leaveRoomAnd(next) {
+    if (this.roomCode) this.socket.emit(EVENTS.LEAVE_ROOM);
+    this.roomCode = null;
+    next();
+  }
+
   showMsg(msg) {
     this.statusDom.setVisible(true);
     this.sNode.innerHTML = `<span style="opacity:.9">${msg}</span>`;
@@ -109,10 +123,12 @@ export default class LobbyScene extends Phaser.Scene {
   createRoom() {
     const character = this.registry.get('character') ?? DEFAULT_CHARACTER;
     console.log('[lobby] 방 만들기 — 내 캐릭터 전송 =', character);
-    this.socket.emit(EVENTS.CREATE_ROOM, { character }, ({ code }) => {
+    this.socket.emit(EVENTS.CREATE_ROOM, { character }, (res) => {
+      if (res?.error) { this.err.textContent = ERRORS[res.error] ?? '방을 만들지 못했어요'; return; }
+      this.err.textContent = '';
       this.isCreator = true;
-      this.roomCode = code;
-      this.showRoom(code);
+      this.roomCode = res.code;
+      this.showRoom(res.code);
     });
   }
 
@@ -122,12 +138,23 @@ export default class LobbyScene extends Phaser.Scene {
     const character = this.registry.get('character') ?? DEFAULT_CHARACTER;
     console.log('[lobby] 입장 — 내 캐릭터 전송 =', character);
     this.socket.emit(EVENTS.JOIN_ROOM, { code: clean, character }, (res) => {
-      if (res?.error === 'NO_ROOM') this.err.textContent = '없는 방 코드예요';
-      else if (res?.error === 'FULL') this.err.textContent = '이미 꽉 찬 방이에요';
-      else { this.err.textContent = ''; this.isCreator = false; this.roomCode = clean; }
+      if (res?.error) { this.err.textContent = ERRORS[res.error] ?? '입장하지 못했어요'; return; }
+      this.err.textContent = '';
+      this.isCreator = false;
+      this.roomCode = clean;
     });
   }
 }
+
+// 서버 ack의 error 코드 → 사람이 읽는 말.
+// ALREADY_IN은 "자기가 만든 방에 자기가 또 들어가려는" 경우다 (입장 버튼 더블클릭 포함).
+// 예전엔 서버가 이걸 허용해서 혼자 2인 대전이 열리고 영원히 안 끝났다.
+const ERRORS = {
+  NO_ROOM: '없는 방 코드예요',
+  FULL: '이미 꽉 찬 방이에요',
+  ALREADY_IN: '이미 그 방에 있어요 — 상대를 기다리세요',
+  SERVER_FULL: '서버가 붐벼요. 잠시 후 다시 시도해주세요',
+};
 
 // --- 인라인 스타일 (두루마리 톤) ---
 const styPanel = `display:flex;flex-direction:column;gap:14px;width:520px;padding:26px;

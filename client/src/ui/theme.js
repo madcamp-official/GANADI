@@ -58,8 +58,12 @@ export const DIFF = {
 };
 
 // 숲속 수련장 배경 (Graphics로 페인팅). depth 최하단.
+// ★ scene.scale.width(=2560, 렌더 배수가 곱해진 캔버스 크기)가 아니라 GAME.WIDTH(=1280)를 쓴다.
+//   카메라가 setZoom(RENDER_SCALE) + centerOn(640,360)이라 실제로 보이는 월드는 0~1280 × 0~720뿐이다.
+//   캔버스 크기로 그리면 잔디 언덕(y=H*1.05)·햇살·뒤 나무가 전부 화면 밖으로 나가고
+//   의도한 구도의 좌상단 1/4만 보인다.
 export function drawForest(scene) {
-  const W = scene.scale.width, H = scene.scale.height;
+  const W = GAME.WIDTH, H = GAME.HEIGHT;
   const g = scene.add.graphics().setDepth(-100);
   // 세로 그라데이션 (위 그늘 → 아래 미드그린)
   g.fillGradientStyle(C.forestDark, C.forestDark, C.forestMid, C.forestMid, 1);

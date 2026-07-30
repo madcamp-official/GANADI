@@ -2,6 +2,7 @@
 
 import Phaser from 'phaser';
 import { GAME } from '../config.js';
+import { pauseHandTracker } from '../recognition/handTracker.js';
 import { getCharacter, spriteKey } from '../data/characters.js';
 import { drawForest, button, pill, CSS, C, hex, hiDPI, FONT } from '../ui/theme.js';
 
@@ -12,6 +13,7 @@ export default class ResultScene extends Phaser.Scene {
 
   create(data) {
     hiDPI(this);
+    pauseHandTracker(); // 결과 화면에선 인식 불필요
     const W = GAME.WIDTH, won = !!data?.won;
     drawForest(this);
 
