@@ -5,6 +5,7 @@ import Phaser from 'phaser';
 import { ALL_SEALS } from '../data/seals.js';
 import { PLAYABLE_SEAL_IDS, SEAL_IDS } from '../../../shared/constants.js';
 import { GAME } from '../config.js';
+import { pauseHandTracker } from '../recognition/handTracker.js';
 import { drawForest, panel, button, DIFF, CSS, C, hex, hiDPI, KANJI_FONT } from '../ui/theme.js';
 
 // 실전 투입 인장 (shared 단일 출처). 전종이면 배지 생략(모두 실전이라 표시 의미 없음).
@@ -36,6 +37,7 @@ export default class CodexScene extends Phaser.Scene {
 
   create() {
     hiDPI(this);
+    pauseHandTracker(); // 도감을 보는 동안 GPU 추론을 돌릴 이유가 없다
     const W = GAME.WIDTH;
     drawForest(this);
 
@@ -94,6 +96,9 @@ export default class CodexScene extends Phaser.Scene {
     // 돌아가기
     const back = button(this, W / 2, GAME.HEIGHT - 40, 220, 54, '← 돌아가기', { fontSize: '22px' });
     back.zone.on('pointerdown', () => (this.modalObjs ? this.closeModal() : this.scene.start('Lobby')));
+
+    // ESC — 팝업이 떠 있으면 닫고, 아니면 로비로. 클릭 말고도 나갈 길을 준다.
+    this.input.keyboard.on('keydown-ESC', () => (this.modalObjs ? this.closeModal() : this.scene.start('Lobby')));
     void hex;
   }
 

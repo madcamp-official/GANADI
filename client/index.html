@@ -27,9 +27,12 @@
       /* 게임 캔버스가 뷰포트를 꽉 채움. 중앙 정렬은 Phaser autoCenter가 담당 (CSS flex 중복 금지) */
       #game { width: 100vw; height: 100vh; }
       /* 상대/내 웹캠 프리뷰 — 캔버스 위 DOM 오버레이 (판정 미사용) */
-      /* 좌상단 — 우상단은 '인장 도감' 버튼 자리라 겹친다 */
-      #video-layer { position: fixed; top: 10px; left: 55px; display: flex; gap: 8px; z-index: 10; }
-      #video-layer video { width: 210px; border-radius: 8px; background: #000; box-shadow: 0 2px 8px rgba(0,0,0,.4); }
+      /* 좌상단 — 우상단은 '인장 도감' 버튼 자리라 겹친다.
+         210px였을 때 캐릭터 선택·로비 패널을 가려서 160px로 줄이고 살짝 투명하게 뒀다.
+         대전 씬에선 BattleScene.positionCams()가 위치·크기를 직접 덮어쓴다. */
+      #video-layer { position: fixed; top: 10px; left: 12px; display: flex; gap: 8px; z-index: 10; }
+      #video-layer video { width: 160px; border-radius: 8px; background: #000; opacity: .88;
+                           box-shadow: 0 2px 8px rgba(0,0,0,.4); }
       /* 상대 캠은 대전 씬에서만 표시 (BattleScene이 켬) */
       #remote-cam { display: none; }
     </style>
