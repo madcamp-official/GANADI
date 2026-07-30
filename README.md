@@ -76,8 +76,8 @@
     </td>
   </tr>
   <tr>
-    <td align="center"><b>유하나</b></td>
-    <td align="center"><b>서영</b></td>
+    <td align="center"><b>유나연</b></td>
+    <td align="center"><b>정서영</b></td>
   </tr>
   <tr>
     <td align="center"><a href="https://github.com/yxxnxyxxn">@yxxnxyxxn</a></td>
